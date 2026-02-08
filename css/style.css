@@ -106,19 +106,20 @@ td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle;
   50% { opacity: 0.5; }
   100% { opacity: 1; }
 }
+
+
+
+
 @media (max-width: 768px) {
 
   .main-grid {
-    display: flex !important;
-    flex-direction: column !important;
+    display: block !important;
   }
 
   .scroll-col {
     width: 100% !important;
-  }
-
-  [style*="grid-template-columns"] {
-    grid-template-columns: 1fr !important;
+    max-width: 100% !important;
+    margin-bottom: 16px;
   }
 
   .table-wrap {
@@ -127,15 +128,6 @@ td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle;
 
   table {
     min-width: 900px;
-  }
-
-  header {
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  header button {
-    width: 100%;
   }
 
 }
