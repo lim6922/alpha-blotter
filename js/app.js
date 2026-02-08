@@ -201,170 +201,141 @@ function importFromCSV(e) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = (event) => {
-  let text = event.target.result;
+    let text = event.target.result;
+    text = text.replace(/^\uFEFF/, ""); // BOM(바이트 오더 마크) 제거
 
-  // ✅ BOM 제거
-  text = text.replace(/^\uFEFF/, "");
-
-  const rows = text.split("\n");
-
+    const rows = text.split(/\r?\n/); // 윈도우/맥 줄바꿈 모두 대응
     const newTrades = [];
-let csvLocalInputAt = null;
     const newATM = [];
-    let newMaster = {};
+    const newMaster = {};
     let newCapitals = { dom: 0, ovs: 0 };
+    let csvLocalInputAt = null;
     let currentSection = "";
-let metaExpectValue = false;
 
-rows.forEach((row, i) => {
-  const tr = row.replace(/\r$/, "").trim(); // CRLF 대비
-  if (!tr) return;
+    rows.forEach((row) => {
+      const tr = row.trim();
+      if (!tr) return; // 빈 줄 건너뛰기
 
-  // 섹션 헤더
-  if (tr === "---META---")   { currentSection = "META";   metaExpectValue = false; return; }
-  if (tr === "---TRADES---") { currentSection = "TRADES"; return; }
-  if (tr === "---MASTER---") { currentSection = "MASTER"; return; }
-  if (tr === "---ATM---")    { currentSection = "ATM";    return; }
-  if (tr === "---CAPITALS---"){ currentSection = "CAPITALS"; return; }
+      // --- 섹션 헤더 감지 ---
+      if (tr === "---META---")    { currentSection = "META"; return; }
+      if (tr === "---TRADES---")  { currentSection = "TRADES"; return; }
+      if (tr === "---MASTER---")  { currentSection = "MASTER"; return; }
+      if (tr === "---ATM---")     { currentSection = "ATM"; return; }
+      if (tr === "---CAPITALS---") { currentSection = "CAPITALS"; return; }
 
-  // 헤더 라인 스킵
-  if (
-    tr.startsWith("Date,Asset,") ||
-    tr.startsWith("Asset,Symbol,") ||
-    tr.startsWith("Date,Account,") ||
-    tr.startsWith("DOM_KRW,")
-  ) return;
+      // 각 섹션의 테이블 헤더 줄 건너뛰기
+      if (tr.startsWith("Date,Asset,") || tr.startsWith("Asset,Symbol,") || 
+          tr.startsWith("Date,Account,") || tr.startsWith("DOM_KRW,") ||
+          tr === "LAST_LOCAL_INPUT_AT") return;
 
-  // META
-  if (currentSection === "META") {
-    if (tr === "LAST_LOCAL_INPUT_AT") { metaExpectValue = true; return; }
-    if (metaExpectValue) {
-      csvLocalInputAt = parseInt(tr, 10) || null;
-      metaExpectValue = false;
-    }
-    return;
-  }
+      // --- 데이터 파싱 ---
+      if (currentSection === "META") {
+        csvLocalInputAt = parseInt(tr, 10) || null;
+        return;
+      }
 
-  // 나머지 섹션들은 CSV 파싱
-  const parts = parseCSVLine(tr);
+      const parts = parseCSVLine(tr);
 
-  // TRADES: Date,Asset,Maturity,Side,Price,Qty,FXRate,StopLoss,Memo,CreatedAt,UpdatedAt
-  if (currentSection === "TRADES") {
-    if (parts.length < 11) return;
+      // 1. 매매 기록 (TRADES)
+      if (currentSection === "TRADES" && parts.length >= 10) {
+        newTrades.push({
+          id: parts[9] ? parseInt(parts[9]) + Math.random() : Date.now() + Math.random(), // ID 중복 방지
+          date: parts[0],
+          asset: parts[1],
+          maturity: parts[2],
+          side: parts[3],
+          price: parseFloat(parts[4]),
+          qty: parseInt(parts[5]),
+          fxRate: parseFloat(parts[6]),
+          stopLoss: (parts[7] && parts[7] !== "") ? parseFloat(parts[7]) : null,
+          memo: (parts[8] || "").replace(/\\n/g, "\n"),
+          createdAt: parts[9] ? parseInt(parts[9]) : Date.now(),
+          updatedAt: parts[10] ? parseInt(parts[10]) : Date.now()
+        });
+      }
 
-    const memo = (parts[8] || "").replace(/\\n/g, "\n"); // export에서 \\n로 저장했으면 복원
-    newTrades.push({
-      id: Date.now() + i,
-      date: (parts[0] || "").trim(),
-      asset: (parts[1] || "").trim(),
-      maturity: (parts[2] || "").trim(),
-      side: (parts[3] || "").trim(),
-      price: parseFloat(parts[4]),
-      qty: parseInt(parts[5], 10),
-      fxRate: parseFloat(parts[6]) || globalFX || 1,
-      stopLoss: (parts[7] !== "" && parts[7] != null) ? parseFloat(parts[7]) : null,
-      memo,
-      createdAt: parts[9] ? parseInt(parts[9], 10) : Date.now(),
-      updatedAt: parts[10] ? parseInt(parts[10], 10) : Date.now(),
+      // 2. 상품 마스터 (MASTER)
+      if (currentSection === "MASTER" && parts.length >= 11) {
+        newMaster[parts[0]] = {
+          symbol: parts[1],
+          ySymbol: parts[2],
+          tick: parseFloat(parts[3]),
+          tickVal: parseFloat(parts[4]),
+          fee: parseFloat(parts[5]),
+          cur: parts[6],
+          marginType: parts[7],
+          initMargin: parseFloat(parts[8]),
+          maintMargin: parseFloat(parts[9]),
+          multiplier: parseFloat(parts[10]),
+          desc: (parts[11] || "").replace(/\\n/g, "\n")
+        };
+      }
+
+      // 3. 입출금 기록 (ATM)
+      if (currentSection === "ATM" && parts.length >= 3) {
+        newATM.push({
+          id: Date.now() + Math.random(),
+          date: parts[0],
+          acc: parts[1],
+          amt: parseFloat(parts[2]),
+          memo: (parts[3] || "").replace(/\\n/g, "\n")
+        });
+      }
+
+      // 4. 초기 자본금 (CAPITALS)
+      if (currentSection === "CAPITALS" && parts.length >= 2) {
+        newCapitals.dom = parseFloat(parts[0]) || 0;
+        newCapitals.ovs = parseFloat(parts[1]) || 0;
+      }
     });
-    return;
-  }
 
-  // MASTER: Asset,Symbol,YSymbol,Tick,TickVal,Fee,Cur,MarginType,InitMargin,MaintMargin,Multiplier,Desc
-  if (currentSection === "MASTER") {
-    if (parts.length < 12) return;
+    // 🔴 [핵심 수정] 데이터 존재 여부 통합 체크
+    const hasTrades = newTrades.length > 0;
+    const hasATM = newATM.length > 0;
+    const hasMaster = Object.keys(newMaster).length > 0;
+    const hasCapitals = newCapitals.dom !== 0 || newCapitals.ovs !== 0;
 
-    const desc = (parts[11] || "").replace(/\\n/g, "\n");
-    newMaster[(parts[0] || "").trim()] = {
-      symbol: (parts[1] || "").trim(),
-      ySymbol: (parts[2] || "").trim(),
-      tick: parseFloat(parts[3]),
-      tickVal: parseFloat(parts[4]),
-      fee: parseFloat(parts[5]),
-      cur: (parts[6] || "").trim(),
-      marginType: (parts[7] || "FIXED").trim(),
-      initMargin: parts[8] ? parseFloat(parts[8]) : 0,
-      maintMargin: parts[9] ? parseFloat(parts[9]) : 0,
-      multiplier: parts[10] ? parseFloat(parts[10]) : 0,
-      desc
-    };
-    return;
-  }
+    if (hasTrades || hasATM || hasMaster || hasCapitals) {
+      const msg = `데이터를 발견했습니다:\n- 매매: ${newTrades.length}건\n- 입출금: ${newATM.length}건\n- 상품설정: ${Object.keys(newMaster).length}건\n\n기존 데이터를 덮어쓰시겠습니까?`;
+      
+      if (confirm(msg)) {
+        // 백업 생성 (선택사항)
+        localStorage.setItem('blotter_backup_before_import', localStorage.getItem('blotter_trades_v96'));
 
-  // ATM: Date,Account,Amount,Memo
-  if (currentSection === "ATM") {
-    if (parts.length < 3) return;
-    const memo = (parts[3] || "").replace(/\\n/g, "\n");
-    newATM.push({
-      id: Date.now() + Math.random(),
-      date: (parts[0] || "").trim(),
-      acc: (parts[1] || "").trim(),
-      amt: parseFloat(parts[2]),
-      memo
-    });
-    return;
-  }
-
-  // CAPITALS: DOM_KRW,OVS_USD
-  if (currentSection === "CAPITALS") {
-    if (parts.length < 2) return;
-    newCapitals.dom = parseFloat(parts[0]) || 0;
-    newCapitals.ovs = parseFloat(parts[1]) || 0;
-    return;
-  }
-});
-
-
-    if (
-  newTrades.length > 0 ||
-  newATM.length > 0 ||
-  newCapitals.dom !== 0 ||
-  newCapitals.ovs !== 0
-) {
-      if (confirm(`모든 데이터(매매, 입출금, 설정자본)를 가져오시겠습니까?`)) {
-if (confirm("기존 데이터를 백업 후 가져올까요?")) {
-  localStorage.setItem('backup_trades', JSON.stringify(trades));
-  localStorage.setItem('backup_atm', JSON.stringify(atmRecords));
-  localStorage.setItem('backup_master', JSON.stringify(master));
-  localStorage.setItem('backup_capitals', JSON.stringify(capitals));
-  localStorage.setItem('backup_meta', JSON.stringify(blotterMeta));
-}
+        // 실제 데이터 교체
         trades = newTrades;
         atmRecords = newATM;
         capitals = newCapitals;
-        if (Object.keys(newMaster).length > 0) master = newMaster;
+        if (hasMaster) master = newMaster;
 
+        // 로컬 스토리지 저장
         localStorage.setItem('blotter_trades_v96', JSON.stringify(trades));
         localStorage.setItem('blotter_atm_v96', JSON.stringify(atmRecords));
         localStorage.setItem('blotter_master_v96', JSON.stringify(master));
         localStorage.setItem('blotter_capitals_v96', JSON.stringify(capitals));
 
-// 🔴 [필수] FX / MTM 복구
-mtmPrices = JSON.parse(localStorage.getItem('blotter_mtm_v96')) || {};
-globalFX  = parseFloat(localStorage.getItem('blotter_fx_v96')) || globalFX;
-
-        // UI 업데이트
-        loadCapitals(); // 설정 화면의 Input 값 채우기
+        // UI 즉시 갱신
+        loadCapitals();
         renderMaster();
         initAssetSelect();
         if (typeof renderATM === "function") renderATM();
         renderAll();
-blotterMeta.lastImportedInputAt = csvLocalInputAt;
 
-// 🔑 IMPORT 직후 로컬 상태는 CSV 상태와 동일해야 함
-blotterMeta.lastLocalInputAt = csvLocalInputAt;
+        // 동기화 상태 업데이트
+        blotterMeta.lastImportedInputAt = csvLocalInputAt;
+        blotterMeta.lastLocalInputAt = csvLocalInputAt || Date.now();
+        saveMeta();
+        updateSyncHeader();
 
-saveMeta();
-updateSyncHeader();
-
-        alert("모든 설정과 데이터가 복구되었습니다.");
+        alert("가져오기가 완료되었습니다.");
       }
     } else {
-      alert("가져올 데이터가 없습니다.");
+      alert("CSV 파일에서 유효한 데이터를 찾을 수 없습니다.");
     }
   };
   reader.readAsText(file);
-}/**
+}
+
 /**
  * =========================
  * 유틸리티: 대기 함수 (프록시 차단 방지용)
