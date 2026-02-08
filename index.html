@@ -3,38 +3,39 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Alpha Blotter v9.6 (Full)</title>
+  <title>Alpha Blotter v9.6 (Maintainable Edition)</title>
+  
+  <!-- 외부 라이브러리: TradingView 차트 위젯 -->
   <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
   <link rel="stylesheet" href="css/style.css">
-
 </head>
 <body>
 
+<!-- =========================================================================
+     [SECTION 1: HEADER] 
+     상단 로고, 데이터 동기화 상태, 글로벌 액션 버튼(가져오기/내보내기)
+     ========================================================================= -->
 <header>
   <div class="header-left">
     <h1 style="font-size:15px; margin:0;">ALPHA BLOTTER <span style="font-weight:normal; opacity:0.5;">v9.6</span></h1>
+    
+    <!-- 동기화 정보: 로컬 데이터와 백업용 CSV 간의 시간차를 모니터링 -->
     <div id="fx-container">
+      <div id="sync-bar" style="display:flex; gap:24px; background:rgba(255,255,255,0.06); padding:6px 14px; border-radius:12px; font-size:11px; margin-left:20px;">
+        <div><b>LOCAL INPUT</b><br><span id="sync-local">-</span></div>
+        <div><b>IMPORT</b><br><span id="sync-import">-</span></div>
+        <div><b>EXPORT</b><br><span id="sync-export">-</span></div>
+      </div>
 
-<div id="sync-bar" style="
-  display:flex;
-  gap:24px;
-  background:rgba(255,255,255,0.06);
-  padding:6px 14px;
-  border-radius:12px;
-  font-size:11px;
-  margin-left:20px;
-">
-  <div><b>LOCAL INPUT</b><br><span id="sync-local">-</span></div>
-  <div><b>IMPORT</b><br><span id="sync-import">-</span></div>
-  <div><b>EXPORT</b><br><span id="sync-export">-</span></div>
-</div>
-
+      <!-- 실시간 시세 상태 표시줄 -->
       <div id="fx-monitor">
         <span style="font-size:10px; color:var(--muted);">시세 대기 중...</span>
       </div>
       <div id="sync-time-display" class="sync-info">갱신 전</div>
     </div>
   </div>
+
+  <!-- 글로벌 액션 버튼 모음 -->
   <div style="display:flex; gap:10px;">
     <button class="btn-outline" id="stealthBtn" onclick="toggleStealthMode()">👁️ 차트 숨기기</button>
     <div style="height:20px; width:1px; background:var(--line); margin:0 5px;"></div>
@@ -44,25 +45,35 @@
     <button class="btn-danger" onclick="clearAllData()">전체삭제</button>
   </div>
 </header>
+<!-- // [END OF HEADER] -->
 
+
+<!-- =========================================================================
+     [SECTION 2: TAB NAVIGATION]
+     대시보드, 성과 리포트, 계좌 설정 간 이동 메뉴
+     ========================================================================= -->
 <div class="nav-tabs">
   <div class="tab-link active" onclick="openTab(event, 'tab-dashboard')">📊 Dashboard</div>
   <div class="tab-link" onclick="openTab(event, 'tab-performance')">📈 Performance Report</div>
   <div class="tab-link" onclick="openTab(event, 'tab-settings')">⚙️ Account Settings</div>
 </div>
 
-<!-- TAB: DASHBOARD -->
+
+<!-- =========================================================================
+     [SECTION 3: TAB - DASHBOARD]
+     메인 실무 화면: 차트, 입력, 현황판, 리스크 모니터
+     ========================================================================= -->
 <div id="tab-dashboard" class="tab-content active">
   <div class="main-grid">
 
-    <!-- LEFT -->
+    <!-- [LEFT COLUMN: 차트 및 입력 섹션] -->
     <div class="scroll-col">
+      
+      <!-- 1-1. 실시간 차트 카드 (TradingView Widget) -->
       <div class="card" id="chartCard">
         <h2>실시간 차트</h2>
         <div id="fx-chart-mini" style="height:220px; border-radius:8px; overflow:hidden; border:1px solid var(--line); margin-bottom:10px;"></div>
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-
-	<!-- 실시간 차트 카드 내부의 select 박스 -->
           <select id="tv-interval" onchange="updateTVChart()">
             <option value="1">1분봉</option><option value="15">15분봉</option><option value="60">1시간봉</option><option value="D" selected>일봉</option>
           </select>
@@ -72,6 +83,7 @@
         </div>
       </div>
 
+      <!-- 1-2. 체결 입력 카드 (매매 기록 생성 및 수정) -->
       <div class="card" id="inputCard">
         <h2 id="inputTitle">체결 입력 <span class="pill" id="availContractsPill">추가매수: -</span></h2>
 
@@ -79,6 +91,7 @@
           <div><label style="font-size:10px; color:var(--muted)">체결일</label><input type="date" id="tradeDate" onchange="syncMaturityFromDTE()" /></div>
           <div><label style="font-size:10px; color:var(--muted)">구분</label><select id="side"><option value="Buy">BUY</option><option value="Sell">SELL</option></select></div>
 
+          <!-- 만기일-DTE 자동 계산 영역 -->
           <div class="date-sync-grid">
             <div><label style="font-size:10px; color:var(--accent)">만기일(캘린더)</label><input type="date" id="maturityDate" onchange="syncDTEFromMaturity()" /></div>
             <div><label style="font-size:10px; color:var(--accent)">DTE(숫자)</label><input type="number" id="dteInput" placeholder="DTE" oninput="syncMaturityFromDTE()" /></div>
@@ -87,12 +100,7 @@
           <div><label style="font-size:10px; color:var(--muted)">상품</label><select id="asset" onchange="onAssetChange()"></select></div>
           <div><label style="font-size:10px; color:var(--muted)">수량</label><input type="number" id="qty" value="1" /></div>
           <div><label style="font-size:10px; color:var(--muted)">체결가</label><input type="number" id="price" step="any" oninput="updateAvailContractsOnPrice()" /></div>
-
-          <div>
-            <label style="font-size:10px; color:var(--bad)">스탑로스</label>
-            <input type="number" id="stopLoss" step="any" />
-          </div>
-
+          <div><label style="font-size:10px; color:var(--bad)">스탑로스</label><input type="number" id="stopLoss" step="any" /></div>
           <div><label style="font-size:10px; color:var(--muted)">적용환율</label><input type="number" id="fxRate" step="0.1" /></div>
 
           <div style="grid-column: span 2;">
@@ -100,65 +108,53 @@
             <textarea id="memoInput" rows="2" placeholder="진입 근거 및 복기..."></textarea>
           </div>
 
+          <!-- 실시간 매수 가능 수량 계산 (증거금 기반) -->
           <div style="grid-column: span 2; padding:8px; border:1px dashed var(--line); border-radius:8px; background:rgba(255,255,255,0.02);">
             <div style="font-size:10px; color:var(--muted); margin-bottom:4px;">추가 매수 가능 (현재 계좌/증거금 기준)</div>
             <div class="mono" style="display:flex; justify-content:space-between; gap:10px;">
               <div>KRW 기준: <b id="availKRW">-</b> 계약</div>
               <div>USD 기준: <b id="availUSD">-</b> 계약</div>
             </div>
-            <div style="font-size:10px; color:var(--muted); margin-top:4px;">* 해외는 고정액, 국내는 (기준가×승수×증거금률)로 계산</div>
           </div>
         </div>
 
         <div class="btn-group-half" style="margin-top:10px;">
- 	 <button id="mainBtn" class="btn-blue btn-main-wide" onclick="addOrUpdateTrade()">기록 저장</button>
-	  <button id="resetBtn" class="btn-outline" onclick="cancelEdit()">초기화</button>
-	  <button id="cancelEditBtn" class="btn-danger hidden" onclick="cancelEdit()">취소</button>
-	</div>
-      </div>
-    </div>
-
-    <!-- CENTER -->
-    <div class="scroll-col">
-
-      <div class="card highlight-card">
-        <h2>요약 (가시성 강화)</h2>
-<div class="stat-row">
-
-  <!-- 실현 순손익 (KRW) -->
-  <div class="stat-card">
-    <div class="stat-label">실현 순손익 (KRW)</div>
-    <div id="total-realized-krw" class="stat-val mono big-val">0</div>
-    <div style="font-size:10px; color:var(--muted)">
-      손익률: <b id="total-realized-pct">0.0%</b>
-    </div>
-  </div>
-
-  <!-- 미실현 평가손익 (KRW) -->
-  <div class="stat-card">
-    <div class="stat-label">미실현 평가손익 (KRW)</div>
-    <div id="total-unrealized-krw" class="stat-val mono big-val">0</div>
-    <div style="font-size:10px; color:var(--muted)">
-      손익률: <b id="total-unrealized-pct">0.0%</b>
-    </div>
-  </div>
-
-<!-- 미실현 평가손익 (USD) 카드 부분 수정 -->
-<div class="stat-card">
-  <div class="stat-label">미실현 평가손익 (USD)</div>
-  <div id="total-unrealized-usd" class="stat-val mono big-val">0.00</div>
-  <div style="font-size:10px; color:var(--muted)">
-    손익률: <b id="total-unrealized-usd-pct">0.0%</b> <!-- 이 부분을 추가 -->
-  </div>
-</div>
-
-</div>
-
-
-        <div id="perf-summary" class="mono" style="font-size:11px; line-height:1.8; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid var(--line); display: grid; grid-template-columns: repeat(3, 1fr); text-align: center;">
+          <button id="mainBtn" class="btn-blue btn-main-wide" onclick="addOrUpdateTrade()">기록 저장</button>
+          <button id="resetBtn" class="btn-outline" onclick="cancelEdit()">초기화</button>
+          <button id="cancelEditBtn" class="btn-danger hidden" onclick="cancelEdit()">취소</button>
         </div>
       </div>
+    </div> <!-- // LEFT COLUMN END -->
 
+
+    <!-- [CENTER COLUMN: 손익 현황 및 포지션 목록] -->
+    <div class="scroll-col">
+
+      <!-- 2-1. 전체 손익 요약 카드 -->
+      <div class="card highlight-card">
+        <h2>요약 (가시성 강화)</h2>
+        <div class="stat-row">
+          <div class="stat-card">
+            <div class="stat-label">실현 순손익 (KRW)</div>
+            <div id="total-realized-krw" class="stat-val mono big-val">0</div>
+            <div style="font-size:10px; color:var(--muted)">손익률: <b id="total-realized-pct">0.0%</b></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">미실현 평가손익 (KRW)</div>
+            <div id="total-unrealized-krw" class="stat-val mono big-val">0</div>
+            <div style="font-size:10px; color:var(--muted)">손익률: <b id="total-unrealized-pct">0.0%</b></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">미실현 평가손익 (USD)</div>
+            <div id="total-unrealized-usd" class="stat-val mono big-val">0.00</div>
+            <div style="font-size:10px; color:var(--muted)">손익률: <b id="total-unrealized-usd-pct">0.0%</b></div>
+          </div>
+        </div>
+        <!-- 성과 세부 통계 지표(PF, 승률 등) -->
+        <div id="perf-summary" class="mono" style="font-size:11px; line-height:1.8; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid var(--line); display: grid; grid-template-columns: repeat(3, 1fr); text-align: center;"></div>
+      </div>
+
+      <!-- 2-2. 활성 포지션 목록 (Active Positions) -->
       <div class="card" style="flex:1;">
         <h2>Active Positions <button class="btn-green" onclick="syncMarketPrices()">🔄 시세 강제 동기화</button></h2>
         <div class="table-wrap">
@@ -173,31 +169,29 @@
           </table>
         </div>
 
+        <!-- 2-3. 개별 체결 이력 (Trade History) -->
         <h2 style="margin-top:20px;">Trade History</h2>
         <div class="table-wrap">
           <table id="historyTable">
             <thead>
               <tr>
-   <th>일자</th><th>상품</th><th>구분</th><th>가격</th>
-<th>수량</th><th>상태</th>
-<th>스탑</th><th>순손익</th><th>손익률</th>
-<th>액션</th><th>메모</th>
+                <th>일자</th><th>상품</th><th>구분</th><th>가격</th><th>수량</th><th>상태</th>
+                <th>스탑</th><th>순손익</th><th>손익률</th><th>액션</th><th>메모</th>
               </tr>
             </thead>
             <tbody></tbody>
           </table>
         </div>
       </div>
+    </div> <!-- // CENTER COLUMN END -->
 
-    </div>
 
-    <!-- RIGHT -->
+    <!-- [RIGHT COLUMN: 자산 현황 및 리스크 모니터] -->
     <div class="scroll-col">
 
-      <!-- Equity (1곳만 표시) -->
+      <!-- 3-1. 실시간 계좌 순자산 (Equity) -->
       <div class="card highlight-card">
         <h2>실시간 계좌 순자산 (Equity)</h2>
-
         <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
           <span style="color:var(--muted)">Domestic (KRW)</span>
           <span id="equity-dom" class="mono up" style="font-weight:bold; font-size:16px;">0</span>
@@ -206,7 +200,6 @@
           <span style="color:var(--muted)">Overseas (USD)</span>
           <span id="equity-ovs" class="mono up" style="font-weight:bold; font-size:16px;">$0</span>
         </div>
-
         <div style="margin-top:10px; font-size:11px; line-height:1.6;">
           <div>🌐 총 순자산(KRW): <b id="equity-total-krw-side" class="mono"></b></div>
           <div style="margin-top:6px;">📉 스탑 기준 최대손실: <b id="stop-risk-krw-side"></b></div>
@@ -214,92 +207,81 @@
         </div>
       </div>
 
-      <!-- Risk Monitor (가시성 강화) -->
+      <!-- 3-2. 증거금 및 여유 현금 모니터 (Risk Monitor) -->
       <div class="card highlight-card">
         <h2>🧯 Risk / Margin Monitor</h2>
         <div class="mono" style="font-size:12px; line-height:1.7;">
-
-  <div class="section-title">🧾 유지증거금 사용</div>  <div class="indent">
-    KRW: <b id="maint-used-krw"></b><br>
-    USD: <b id="maint-used-usd"></b>  </div>
-
-  <div class="section-title">💧 유지증거금 여유</div>  <div class="indent">
-    KRW: <b id="maint-free-krw"></b><br>
-    USD: <b id="maint-free-usd"></b>  </div>
-
-  <div class="section-title">🧯 유지증거금 사용률</div>  <div class="indent">
-    KRW: <b id="maint-ratio-krw"></b><br>
-    USD: <b id="maint-ratio-usd"></b>  </div>
-
-  <div id="margin-alert-side" style="margin-top:6px;"></div>
-
+          <div class="section-title">🧾 유지증거금 사용</div><div class="indent">KRW: <b id="maint-used-krw"></b><br>USD: <b id="maint-used-usd"></b></div>
+          <div class="section-title">💧 유지증거금 여유</div><div class="indent">KRW: <b id="maint-free-krw"></b><br>USD: <b id="maint-free-usd"></b></div>
+          <div class="section-title">🧯 유지증거금 사용률</div><div class="indent">KRW: <b id="maint-ratio-krw"></b><br>USD: <b id="maint-ratio-usd"></b></div>
+          <div id="margin-alert-side" style="margin-top:6px;"></div>
           <div style="margin-top:10px; border-top:1px solid var(--line); padding-top:10px;">
-            <div style="color:var(--muted); font-size:12px; margin-bottom:4px;">통화별 Free Margin(참고)</div>
-            <div>KRW Free: <b id="free-krw"></b></div>
-            <div>USD Free: <b id="free-usd"></b></div>
-
-<div style="margin-top:10px; border-top:1px solid var(--line); padding-top:10px;">
-  <div style="color:var(--muted); font-size:12px;">📝 위탁증거금(주문 기준)</div>
-  <div>KRW: <b id="init-used-krw"></b></div>
-  <div>USD: <b id="init-used-usd"></b></div>
-</div>
-
-<div style="margin-top:10px; border-top:1px solid var(--line); padding-top:10px;">
-  <div style="color:var(--muted); font-size:12px;">💳 주문가능현금 (Equity - 위탁증거금)</div>
-  <div>KRW: <b id="avail-cash-krw"></b></div>
-  <div>USD: <b id="avail-cash-usd"></b></div>
-</div>
-
+            <div>KRW Free: <b id="free-krw"></b></div><div>USD Free: <b id="free-usd"></b></div>
+            <div style="margin-top:10px; border-top:1px solid var(--line); padding-top:10px;">
+              <div style="color:var(--muted); font-size:12px;">📝 위탁증거금: <b id="init-used-krw"></b> / <b id="init-used-usd"></b></div>
+              <div style="color:var(--muted); font-size:12px;">💳 주문가능현금: <b id="avail-cash-krw"></b> / <b id="avail-cash-usd"></b></div>
+            </div>
           </div>
         </div>
       </div>
 
+<!-- 3-3. 상품 마스터 관리 (신규 상품 등록 및 증거금/틱가치 설정) -->
+<div class="card" id="masterInputCard">
+  <h2>상품 마스터 관리</h2>
+  
+  <!-- 등록된 상품 리스트 출력 영역 (JS에서 내부 내용 채움) -->
+  <div id="master-list" style="margin-bottom:10px; max-height:280px; overflow-y:auto;"></div>
+
+  <!-- 상품 정보 입력 및 수정 폼 시작 -->
+  <div id="masterFormArea" style="background:rgba(255,255,255,0.03); padding:12px; border-radius:8px; border:1px dashed var(--line);">
+    
+    <!-- 행 1: 상품 식별자 -->
+    <div style="margin-bottom:8px;">
+      <div class="master-label">상품명 (ID)</div>
+      <input type="text" id="newAsset" placeholder="예: MES, MNQ, USDKRW">
+    </div>
+
+    <!-- 행 2: 외부 심볼 및 통화 설정 -->
+    <div class="master-grid">
+      <div><div class="master-label">TradingView 심볼</div><input type="text" id="newSymbol"></div>
+      <div><div class="master-label">YahooFinance 심볼</div><input type="text" id="newYSymbol"></div>
+      <div><div class="master-label">결제 통화</div><select id="newCur"><option value="USD">USD</option><option value="KRW">KRW</option></select></div>
+    </div>
+
+    <!-- 행 3: 비용 및 틱 단위 설정 -->
+    <div class="master-grid" style="margin-top:8px;">
+      <div><div class="master-label">수수료(편도)</div><input type="number" id="newFee" step="0.01"></div>
+      <div><div class="master-label">틱 크기(Tick)</div><input type="number" id="newTick" step="0.0001"></div>
+      <div><div class="master-label">틱 가치(Value)</div><input type="number" id="newTickVal" step="0.01"></div>
+    </div>
+
+    <!-- 행 4: 증거금 정책 설정 (국내/해외 구분) -->
+    <div class="master-grid" style="margin-top:8px;">
+      <div><div class="master-label">증거금 방식</div><select id="newMarginType"><option value="FIXED">해외(고정액)</option><option value="PCT">국내(비율)</option></select></div>
+      <div><div class="master-label">위탁증거금</div><input type="number" id="newInitMargin" step="0.01"></div>
+      <div><div class="master-label">유지증거금</div><input type="number" id="newMaintMargin" step="0.01"></div>
+    </div>
+
+    <!-- 행 5: 승수 및 상세 설명 (이 부분이 이전 답변에서 누락되었습니다) -->
+    <div class="master-grid" style="margin-top:8px;">
+      <div><div class="master-label">승수(Multiplier)</div><input type="number" id="newMultiplier" step="1"></div>
+      <div style="grid-column: span 2;"><div class="master-label">간략 설명</div><input type="text" id="newDesc"></div>
+    </div>
+
+    <!-- 하단 액션 버튼 -->
+    <div class="btn-group-half" style="margin-top:12px;">
+      <button id="addAssetBtn" class="btn-blue btn-main-wide" onclick="addOrUpdateAsset()">상품 추가/업데이트</button>
+      <button id="masterResetBtn" class="btn-outline" onclick="masterResetForm()">초기화</button>
+      <button id="cancelMasterEditBtn" class="btn-danger hidden" onclick="clearAssetForm()">취소</button>
+    </div>
+  </div>
+  <!-- // masterFormArea END -->
+</div>
+<!-- // [END OF 3-3: 상품 마스터 관리] -->
 
 
 
-<!-- Master -->
-      <div class="card" id="masterInputCard">
-        <h2>상품 마스터 관리</h2>
-        <div id="master-list" style="margin-bottom:10px; max-height:280px; overflow-y:auto;"></div>
-
-        <div id="masterFormArea" style="background:rgba(255,255,255,0.03); padding:12px; border-radius:8px; border:1px dashed var(--line);">
-          <div style="margin-bottom:8px;">
-            <div class="master-label">상품명 (ID)</div>
-            <input type="text" id="newAsset" placeholder="예: MES, MNQ, USDKRW">
-          </div>
-
-          <div class="master-grid">
-            <div><div class="master-label">TradingView 심볼</div><input type="text" id="newSymbol"></div>
-            <div><div class="master-label">YahooFinance 심볼</div><input type="text" id="newYSymbol"></div>
-            <div><div class="master-label">결제 통화</div><select id="newCur"><option value="USD">USD</option><option value="KRW">KRW</option></select></div>
-          </div>
-
-          <div class="master-grid" style="margin-top:8px;">
-            <div><div class="master-label">수수료(편도)</div><input type="number" id="newFee" step="0.01"></div>
-            <div><div class="master-label">틱 크기(Tick)</div><input type="number" id="newTick" step="0.0001"></div>
-            <div><div class="master-label">틱 가치(Value)</div><input type="number" id="newTickVal" step="0.01"></div>
-          </div>
-
-          <div class="master-grid" style="margin-top:8px;">
-            <div><div class="master-label">증거금 방식</div><select id="newMarginType"><option value="FIXED">해외(고정액)</option><option value="PCT">국내(비율)</option></select></div>
-            <div><div class="master-label">위탁증거금</div><input type="number" id="newInitMargin" step="0.01"></div>
-            <div><div class="master-label">유지증거금</div><input type="number" id="newMaintMargin" step="0.01"></div>
-          </div>
-
-          <div class="master-grid" style="margin-top:8px;">
-            <div><div class="master-label">승수(Multiplier)</div><input type="number" id="newMultiplier" step="1"></div>
-            <div style="grid-column: span 2;"><div class="master-label">간략 설명</div><input type="text" id="newDesc"></div>
-          </div>
-
-          <div class="btn-group-half" style="margin-top:12px;">
-            <button id="addAssetBtn" class="btn-blue btn-main-wide" onclick="addOrUpdateAsset()">상품 추가</button>
-            <button id="masterResetBtn" class="btn-outline" onclick="masterResetForm()">초기화</button>
-            <button id="cancelMasterEditBtn" class="btn-danger hidden" onclick="clearAssetForm()">취소</button>
-          </div>
-        </div>
-      </div>
-
-<!-- Tick calc -->
+      <!-- 3-4. 틱 가치 계산기 -->
       <div class="card">
         <h2>실전 틱 가치 계산기</h2>
         <div class="calc-box">
@@ -309,15 +291,17 @@
         </div>
       </div>
 
-    </div> <!-- scroll-col (RIGHT) 종료 -->
-  </div> <!-- main-grid 종료 -->
-</div> <!-- tab-dashboard 종료 -->
+    </div> <!-- // RIGHT COLUMN END -->
+  </div> <!-- // MAIN GRID END -->
+</div> <!-- // DASHBOARD TAB END -->
 
-<!-- 이 아래부터는 tab-dashboard와 동등한 위치(Sibling)에 있어야 합니다 -->
-<!-- [탭 2] PERFORMANCE TAB -->
+
+<!-- =========================================================================
+     [SECTION 4: TAB - PERFORMANCE REPORT]
+     특정 기간별 손익 분석 및 상세 매매 리포트
+     ========================================================================= -->
 <div id="tab-performance" class="tab-content">
   <div class="report-wrapper">
-
       <div class="report-filter">
         <div class="filter-item"><label>조회 시작일</label><input type="date" id="repStartDate"></div>
         <div class="filter-item"><label>조회 종료일</label><input type="date" id="repEndDate"></div>
@@ -325,9 +309,9 @@
       </div>
 
       <div class="summary-grid">
-        <div class="stat-card"><div class="stat-label">기간 실현손익 (KRW)</div><div id="rep-realized" class="stat-val mono">0</div></div>
-        <div class="stat-card"><div class="stat-label">기간 수수료 (KRW)</div><div id="rep-fee" class="stat-val mono">0</div></div>
-        <div class="stat-card"><div class="stat-label">기간 순손익 (Net)</div><div id="rep-net" class="stat-val mono" style="color:var(--accent)">0</div></div>
+        <div class="stat-card"><div class="stat-label">기간 실현손익</div><div id="rep-realized" class="stat-val mono">0</div></div>
+        <div class="stat-card"><div class="stat-label">기간 수수료</div><div id="rep-fee" class="stat-val mono">0</div></div>
+        <div class="stat-card"><div class="stat-label">기간 순손익</div><div id="rep-net" class="stat-val mono" style="color:var(--accent)">0</div></div>
         <div class="stat-card"><div class="stat-label">매매횟수 / 승률</div><div id="rep-winrate" class="stat-val mono">-</div></div>
         <div class="stat-card"><div class="stat-label">Profit Factor</div><div id="rep-pf" class="stat-val mono">-</div></div>
       </div>
@@ -338,9 +322,8 @@
           <table id="repDetailTable">
             <thead>
               <tr>
-                <th>날짜</th><th>상품</th><th>구분</th><th>가격</th><th>수량</th>
-<th>상태</th>
-                <th>실현손익(KRW)</th><th>수수료(KRW)</th><th>순손익(KRW)</th><th>손익률</th><th>메모</th>
+                <th>날짜</th><th>상품</th><th>구분</th><th>가격</th><th>수량</th><th>상태</th>
+                <th>실현손익</th><th>수수료</th><th>순손익</th><th>손익률</th><th>메모</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -348,57 +331,56 @@
         </div>
       </div>
     </div>
-  </div>
+</div> <!-- // PERFORMANCE TAB END -->
 
-  <!-- [탭 3] SETTINGS TAB -->
-  <div id="tab-settings" class="tab-content">
-    <div class="report-wrapper" style="max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1.5fr; gap: 20px;">
-      <!-- 왼쪽: 자본 및 ATM 입력 -->
-      <div class="scroll-col">
-        <div class="card">
-          <h2>⚙️ 계좌 기초 원금 (Initial Capital)</h2>
-          <div style="margin-bottom:10px;">
-            <label style="font-size:10px; color:var(--muted)">국내 기초 자본 (KRW)</label>
-            <input type="number" id="capital-dom" onchange="saveCapitals()">
-          </div>
-          <div>
-            <label style="font-size:10px; color:var(--muted)">해외 기초 자본 (USD)</label>
-            <input type="number" id="capital-ovs" onchange="saveCapitals()">
-          </div>
-        </div>
 
-        <div class="card">
-          <h2>🏧 입출금 기록 (ATM)</h2>
-          <div style="display:flex; flex-direction:column; gap:8px;">
-            <select id="atm-account"><option value="DOM">국내 계좌 (KRW)</option><option value="OVS">해외 계좌 (USD)</option></select>
-            <input type="date" id="atm-date">
-            <input type="number" id="atm-amount" placeholder="금액 (입금: 50000 / 출금: -20000)">
-            <input type="text" id="atm-memo" placeholder="입출금 사유">
-            <button class="btn-blue" onclick="addATMRecord()">기록 저장</button>
-          </div>
-        </div>
+<!-- =========================================================================
+     [SECTION 5: TAB - SETTINGS]
+     계좌 원금 설정 및 입출금(ATM) 관리
+     ========================================================================= -->
+<div id="tab-settings" class="tab-content">
+  <div class="report-wrapper" style="max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1.5fr; gap: 20px;">
+    
+    <!-- 설정 왼쪽: 자본금 및 입출금 입력 -->
+    <div class="scroll-col">
+      <div class="card">
+        <h2>⚙️ 계좌 기초 원금 (Initial Capital)</h2>
+        <div><label style="font-size:10px; color:var(--muted)">국내 (KRW)</label><input type="number" id="capital-dom" onchange="saveCapitals()"></div>
+        <div><label style="font-size:10px; color:var(--muted)">해외 (USD)</label><input type="number" id="capital-ovs" onchange="saveCapitals()"></div>
       </div>
 
-      <!-- 오른쪽: ATM 내역 -->
       <div class="card">
-        <h2>🏦 입출금 내역 및 누계</h2>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
-          <div class="stat-card"><div class="stat-label">국내 입출금 합계</div><div id="atm-total-dom" class="mono">0</div></div>
-          <div class="stat-card"><div class="stat-label">해외 입출금 합계</div><div id="atm-total-ovs" class="mono">0</div></div>
-        </div>
-        <div class="table-wrap" style="max-height: 500px;">
-          <table id="atmTable">
-            <thead>
-              <tr><th>날짜</th><th>계좌</th><th>금액</th><th>메모</th><th>관리</th></tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+        <h2>🏧 입출금 기록 (ATM)</h2>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <select id="atm-account"><option value="DOM">국내 계좌</option><option value="OVS">해외 계좌</option></select>
+          <input type="date" id="atm-date">
+          <input type="number" id="atm-amount" placeholder="금액 (입금+, 출금-)">
+          <input type="text" id="atm-memo" placeholder="입출금 사유">
+          <button class="btn-blue" onclick="addATMRecord()">기록 저장</button>
         </div>
       </div>
     </div>
+
+    <!-- 설정 오른쪽: ATM 내역 리스트 -->
+    <div class="card">
+      <h2>🏦 입출금 내역 및 누계</h2>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
+        <div class="stat-card"><div class="stat-label">국내 입출금 합계</div><div id="atm-total-dom" class="mono">0</div></div>
+        <div class="stat-card"><div class="stat-label">해외 입출금 합계</div><div id="atm-total-ovs" class="mono">0</div></div>
+      </div>
+      <div class="table-wrap" style="max-height: 500px;">
+        <table id="atmTable">
+          <thead><tr><th>날짜</th><th>계좌</th><th>금액</th><th>메모</th><th>관리</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
   </div>
+</div> <!-- // SETTINGS TAB END -->
 
 
 <script src="js/app.js"></script>
+
+
 </body>
 </html>
