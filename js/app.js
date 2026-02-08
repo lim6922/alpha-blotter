@@ -365,108 +365,134 @@ updateSyncHeader();
   };
   reader.readAsText(file);
 }/**
+/**
  * =========================
- * Market prices (Yahoo via proxy)
+ * 유틸리티: 대기 함수 (프록시 차단 방지용)
+ * =========================
+ */
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * =========================
+ * Market prices (Yahoo via proxy) - 성능 개선 버전
  * =========================
  */
 async function fetchYahooPrice(ySymbol) {
-  // 1순위: corsproxy.io, 2순위: allorigins (백업)
   const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ySymbol}?interval=1m&range=1d&_seed=${Date.now()}`;
   
-  // 시도 1: corsproxy.io
+  // 1순위 프록시: corsproxy.io
   try {
     const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
     if (res.ok) {
       const data = await res.json();
-      return data?.chart?.result?.[0]?.meta?.regularMarketPrice || null;
+      const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+      if (price) return price;
     }
-  } catch (e) { console.warn("Proxy 1 failed"); }
+  } catch (e) { console.warn(`Proxy 1 failed for ${ySymbol}`); }
 
-  // 시도 2: allorigins
+  // 2순위 프록시: allorigins (백업)
   try {
     const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
     if (res.ok) {
       const json = await res.json();
       const data = JSON.parse(json.contents);
-      return data?.chart?.result?.[0]?.meta?.regularMarketPrice || null;
+      const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+      if (price) return price;
     }
-  } catch (e) { console.warn("Proxy 2 failed"); }
+  } catch (e) { console.warn(`Proxy 2 failed for ${ySymbol}`); }
 
   return null;
 }
 
+/**
+ * 시세 동기화 메인 함수
+ * Promise.all 대신 순차적 루프를 사용하여 프록시 차단을 방지합니다.
+ */
 async function syncMarketPrices() {
   const btn = document.querySelector('.btn-green');
   const monitor = document.getElementById('fx-monitor');
   const syncDisplay = document.getElementById('sync-time-display');
 
-  btn.innerText = "⏳ 시세 동기화 중...";
+  if (!btn || !monitor) return;
+
+  btn.innerText = "⏳ 시세 요청 중...";
   btn.disabled = true;
 
   const assetKeys = Object.keys(master).filter(id => master[id] && master[id].ySymbol);
+  let updatedCount = 0;
+  let htmlBuffer = ""; // 화면 깜빡임 방지를 위한 버퍼
 
   try {
-    const results = await Promise.all(assetKeys.map(async (id) => {
+    // [중요] 순차적으로 하나씩 가져오기 (프록시 안정성 확보)
+    for (const id of assetKeys) {
       const price = await fetchYahooPrice(master[id].ySymbol);
-      return { id, price };
-    }));
-
-    monitor.innerHTML = "";
-    let updatedCount = 0;
-
-    results.forEach(({ id, price }) => {
-      if (price === null) return;
-      const m = master[id];
-      updatedCount++;
-
-      if (id === "USDKRW" || m.ySymbol === "KRW=X") {
-        globalFX = price;
-        localStorage.setItem('blotter_fx_v96', String(globalFX));
-      }
-
       
-      // 마스터 데이터 기준의 최신가도 저장 (입력창 자동입력용)
-      mtmPrices[`LAST_${id}`] = price;
+      if (price !== null) {
+        const m = master[id];
+        updatedCount++;
 
-      const isFX = id === "USDKRW";
-      monitor.innerHTML += `<span class="price-tag" style="color:${isFX ? 'var(--warn)' : 'var(--text)'}">${id} ${price.toFixed(2)}</span>`;
+        // 환율 정보 업데이트
+        if (id === "USDKRW" || m.ySymbol === "KRW=X") {
+          globalFX = price;
+          localStorage.setItem('blotter_fx_v96', String(globalFX));
+        }
+
+        // 최신가 저장
+        mtmPrices[`LAST_${id}`] = price;
+
+        // 화면 표시용 태그 생성
+        const isFX = id === "USDKRW";
+        htmlBuffer += `<span class="price-tag" style="color:${isFX ? 'var(--warn)' : 'var(--text)'}">${id} ${price.toFixed(2)}</span>`;
+      } else {
+        // 만약 이번에 가져오기 실패했다면 기존에 저장된 값이 있는지 확인하여 유지
+        const prevPrice = mtmPrices[`LAST_${id}`];
+        if (prevPrice) {
+          htmlBuffer += `<span class="price-tag" style="opacity:0.5;">${id} ${prevPrice.toFixed(2)}?</span>`;
+        }
+      }
+      
+      // 요청 간에 200ms 휴식 (프록시 서버 보호 및 안정성)
+      await sleep(200);
+    }
+
+    // 결과 화면 반영
+    monitor.innerHTML = htmlBuffer || '<span style="font-size:10px; color:var(--muted);">시세 응답 없음</span>';
+
+    // ================================
+    // [Active Positions] 현재가 일괄 업데이트
+    // ================================
+    const res = calculateEngine();
+    res.openPos.forEach(p => {
+      const last = mtmPrices[`LAST_${p.asset}`];
+      if (last != null) {
+        mtmPrices[p.key] = last; // 포지션별 MTM 가격 갱신
+      }
     });
 
-// ================================
-// [강제 시세 동기화] Active Positions 현재가 덮어쓰기
-// ================================
-const res = calculateEngine();
-res.openPos.forEach(p => {
-  const last = mtmPrices[`LAST_${p.asset}`];
-  if (last != null) {
-    mtmPrices[p.key] = last;
-  }
-});
-
-// 덮어쓴 MTM 다시 저장
-localStorage.setItem('blotter_mtm_v96', JSON.stringify(mtmPrices));
+    localStorage.setItem('blotter_mtm_v96', JSON.stringify(mtmPrices));
     
-    // --- [추가된 로직]: 현재 선택된 상품의 체결가 칸에 현재가 자동 입력 ---
+    // 입력창 자동 입력 (현재 선택된 자산 기준)
     const currentAsset = document.getElementById('asset').value;
     if (mtmPrices[`LAST_${currentAsset}`]) {
         document.getElementById('price').value = mtmPrices[`LAST_${currentAsset}`];
     }
-    // -------------------------------------------------------------
 
     const now = new Date().toLocaleTimeString();
-    syncDisplay.innerText = updatedCount > 0 ? `최근 갱신: ${now}` : "갱신 실패";
+    syncDisplay.innerText = updatedCount > 0 ? `최근 갱신: ${now}` : "일부 갱신 실패";
     
     renderAll(); 
     runCalc();   
 
   } catch (error) {
-    console.error("시세 동기화 중 오류 발생:", error);
-    syncDisplay.innerText = "네트워크 오류 발생";
+    console.error("동기화 중 오류:", error);
+    syncDisplay.innerText = "네트워크 오류";
   } finally {
     btn.innerText = "🔄 시세 강제 동기화";
     btn.disabled = false;
   }
 }
+
+
 
 /**
  * =========================
