@@ -109,25 +109,55 @@ td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle;
 
 
 
-
+/* =========================
+   📱 MOBILE OPTIMIZATION
+   ========================= */
 @media (max-width: 768px) {
 
+  /* 1️⃣ 레이아웃: 3열 → 세로 1열 */
   .main-grid {
-    display: block !important;
+    display: flex !important;
+    flex-direction: column;
   }
 
-  .scroll-col {
-    width: 100% !important;
-    max-width: 100% !important;
-    margin-bottom: 16px;
+  /* 2️⃣ 컬럼 순서 재배치 */
+  .main-grid > .scroll-col:nth-child(1) { order: 2; } /* LEFT */
+  .main-grid > .scroll-col:nth-child(2) { order: 1; } /* CENTER */
+  .main-grid > .scroll-col:nth-child(3) { order: 3; } /* RIGHT */
+
+  /* 3️⃣ 기본 표시: CENTER만 */
+  .main-grid > .scroll-col:nth-child(1),
+  .main-grid > .scroll-col:nth-child(3) {
+    display: none;
   }
 
+  /* 4️⃣ CENTER는 전체 폭 */
+  .main-grid > .scroll-col:nth-child(2) {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* 5️⃣ 카드 간 여백 */
+  .card {
+    margin-bottom: 14px;
+  }
+
+  /* 6️⃣ 테이블은 가로 스크롤 */
   .table-wrap {
     overflow-x: auto;
   }
 
   table {
     min-width: 900px;
+  }
+
+  /* 7️⃣ 입력 요소 크기 보정 */
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 14px;
   }
 
 }
