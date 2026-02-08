@@ -1800,18 +1800,9 @@ if (status === 'OK') {
 }
 
 if (status === 'WARN') {
-  // EXPORT만 경고
+  localEl.classList.add('sync-warn');
+  importEl.classList.add('sync-warn');
   exportEl.classList.add('sync-warn');
-
-  // LOCAL은 깨끗하면 OK로
-  if (imp && local === imp) {
-    localEl.classList.add('sync-ok');
-  } else {
-    localEl.classList.add('sync-warn');
-  }
-
-  // IMPORT는 기준 데이터
-  if (imp) importEl.classList.add('sync-ok');
 }
 
 if (status === 'DANGER') {
@@ -1869,12 +1860,10 @@ function getSyncStatus(local, imp, exp) {
   // 🚨 CSV가 더 최신 → 덮어쓰기 위험
   if (I && I > L) return 'DANGER';
 
-  // ⚠️ 로컬 수정 후 EXPORT 안 됨
-  if (!E || L > E) return 'WARN';
+  // 🔵 LOCAL이 IMPORT 또는 EXPORT와 동일
+  if ((I && L === I) || (E && L === E)) return 'OK';
 
-  // ✅ 로컬과 EXPORT가 동일 → 완전 동기화
-  if (E && L === E) return 'OK';
-
+  // 🟡 그 외는 전부 경고
   return 'WARN';
 }
 
