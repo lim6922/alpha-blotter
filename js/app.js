@@ -1793,30 +1793,33 @@ function updateSyncHeader() {
 
   const status = getSyncStatus(local, imp, exp);
 
-  if (status === 'OK') {
+if (status === 'OK') {
+  localEl.classList.add('sync-ok');
+  importEl.classList.add('sync-ok');
+  exportEl.classList.add('sync-ok');
+}
+
+if (status === 'WARN') {
+  // EXPORT만 경고
+  exportEl.classList.add('sync-warn');
+
+  // LOCAL은 깨끗하면 OK로
+  if (imp && local === imp) {
     localEl.classList.add('sync-ok');
-    importEl.classList.add('sync-ok');
-    exportEl.classList.add('sync-ok');
-    return;
-  }
-
-  if (status === 'DANGER') {
-    // ✅ IMPORT가 더 최신: IMPORT는 빨강, LOCAL/EXPORT는 경고로
-    importEl.classList.add('sync-danger');
+  } else {
     localEl.classList.add('sync-warn');
-    exportEl.classList.add('sync-warn');
-    return;
   }
 
-  if (status === 'WARN') {
-    // ✅ LOCAL이 최신인데 EXPORT가 뒤쳐짐: LOCAL+EXPORT 노랑
-    localEl.classList.add('sync-warn');
-    exportEl.classList.add('sync-warn');
+  // IMPORT는 기준 데이터
+  if (imp) importEl.classList.add('sync-ok');
+}
 
-    // IMPORT는 마지막 가져온 시점이므로 "정상" 표시해도 됨
-    if (imp) importEl.classList.add('sync-ok');
-    return;
-  }
+if (status === 'DANGER') {
+  importEl.classList.add('sync-danger');
+  localEl.classList.add('sync-warn');
+  exportEl.classList.add('sync-warn');
+}
+
 
   // INIT: 아무것도 없으면 굳이 색칠 안 함(원하면 warn 처리 가능)
 }
@@ -1857,20 +1860,23 @@ function parseCSVLine(line) {
 }
 
 function getSyncStatus(local, imp, exp) {
-  const L = (local == null || local === "") ? null : Number(local);
-  const I = (imp   == null || imp   === "") ? null : Number(imp);
-  const E = (exp   == null || exp   === "") ? null : Number(exp);
+  const L = local ? Number(local) : null;
+  const I = imp   ? Number(imp)   : null;
+  const E = exp   ? Number(exp)   : null;
 
   if (!L) return 'INIT';
 
-  // ✅ OK: local이 import 또는 export와 같으면 정상
-  if ((I && L === I) || (E && L === E)) return 'OK';
-
-  // 🚨 DANGER: CSV(import)가 local보다 최신 (가져오면 덮어쓸 위험)
+  // 🚨 CSV가 더 최신 → 덮어쓰기 위험
   if (I && I > L) return 'DANGER';
 
-  // ⚠️ WARN: local 변경 후 export 안 됨
+  // ⚠️ 로컬 수정 후 EXPORT 안 됨
+  if (!E || L > E) return 'WARN';
+
+  // ✅ 로컬과 EXPORT가 동일 → 완전 동기화
+  if (E && L === E) return 'OK';
+
   return 'WARN';
 }
+
 
 //* 20260208_2121수정 *//
