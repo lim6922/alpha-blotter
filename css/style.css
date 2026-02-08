@@ -171,3 +171,13 @@ td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle;
   }
 
 }
+
+@media (max-width: 768px) {
+
+  /* 🔥 main-grid 높이 고정 해제 (핵심) */
+  .main-grid {
+    height: auto !important;
+  }
+
+}
+
