@@ -174,3 +174,158 @@ td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle;
   }
 
 }
+
+
+/* ==================================================
+   📱 MOBILE CSS (RESET & SAFE VERSION)
+   ================================================== */
+@media (max-width: 768px) {
+
+  /* ----------------------------------
+     0. 기본 리셋
+     ---------------------------------- */
+  html, body {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    overflow-y: auto;
+  }
+
+  /* ----------------------------------
+     1. HEADER
+     ---------------------------------- */
+  header {
+    display: block;
+    padding: 10px 12px;
+  }
+
+  .header-left {
+    display: block;
+    width: 100%;
+  }
+
+  #fx-container {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+  }
+
+  #fx-monitor {
+    display: block;
+    width: 100%;
+    white-space: normal;
+    margin-bottom: 6px;
+  }
+
+  .price-tag {
+    display: inline-block;
+    margin-right: 6px;
+    font-size: 10px;
+  }
+
+  #sync-bar {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  /* 헤더 버튼 영역 */
+  header > div:last-child {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  header > div:last-child button {
+    width: 100%;
+    white-space: nowrap;
+  }
+
+  /* ----------------------------------
+     2. TABS
+     ---------------------------------- */
+  .nav-tabs {
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .tab-link {
+    padding: 10px 14px;
+    font-size: 12px;
+  }
+
+  /* ----------------------------------
+     3. TAB CONTENT (공통)
+     ---------------------------------- */
+  .tab-content {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* ----------------------------------
+     4. DASHBOARD
+     ---------------------------------- */
+  #tab-dashboard .main-grid {
+    display: block;
+    height: auto !important;
+    padding: 10px;
+  }
+
+  #tab-dashboard .scroll-col {
+    width: 100%;
+    overflow: visible;
+    margin-bottom: 16px;
+  }
+
+  #tab-dashboard .card {
+    margin-bottom: 14px;
+  }
+
+  /* ----------------------------------
+     5. TABLE
+     ---------------------------------- */
+  .table-wrap {
+    overflow-x: auto;
+  }
+
+  table {
+    min-width: 900px;
+  }
+
+  /* ----------------------------------
+     6. ACCOUNT SETTINGS
+     ---------------------------------- */
+  #tab-settings .report-wrapper {
+    display: block;
+    padding: 12px;
+  }
+
+  #tab-settings .scroll-col {
+    width: 100%;
+    margin-bottom: 16px;
+    overflow: visible;
+  }
+
+  #tab-settings .card {
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
+  #tab-settings input,
+  #tab-settings select,
+  #tab-settings textarea {
+    font-size: 15px;
+    padding: 10px;
+  }
+
+  #tab-settings table {
+    min-width: 600px;
+  }
+
+}
+
+
