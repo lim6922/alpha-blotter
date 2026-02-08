@@ -400,3 +400,49 @@ td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle;
 
 }
 
+/* =========================
+   📱 MOBILE OVERFLOW FINAL FIX
+   ========================= */
+@media (max-width: 768px) {
+
+  /* ----------------------------------
+     1. SYNC BAR (EXPORT / IMPORT)
+     ---------------------------------- */
+  #sync-bar {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px !important;
+    max-width: 100%;
+  }
+
+  #sync-bar > div {
+    min-width: 0 !important;
+    text-align: center;
+    font-size: 10px;
+    line-height: 1.2;
+  }
+
+  #sync-bar b {
+    display: block;
+    white-space: normal;
+  }
+
+  /* ----------------------------------
+     2. ACCOUNT SETTINGS GRID FIX
+     ---------------------------------- */
+  #tab-settings .report-wrapper {
+    display: block !important;
+  }
+
+  #tab-settings .report-wrapper > * {
+    max-width: 100%;
+  }
+
+  /* 혹시 남아 있는 grid/flex 강제 해제 */
+  #tab-settings [style*="grid-template-columns"],
+  #tab-settings [class*="grid"] {
+    grid-template-columns: 1fr !important;
+  }
+
+}
+
