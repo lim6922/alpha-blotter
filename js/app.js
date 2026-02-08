@@ -787,14 +787,39 @@ function calculateInitMarginSummary(res) {
 
 
 
-
 /**
- * =========================
- * Rendering
- * =========================
+ * =========================================================================
+ * [CORE RENDERING] 화면 전체 데이터 업데이트
+ * 엔진에서 계산된 수치들을 대시보드 각 UI 요소에 바인딩합니다.
+ * =========================================================================
  */
 function renderAll() {
   const res = calculateEngine();
+
+  // ---------------------------------------------------------
+  // 1. 체결(Trade) 기준 성과 지표 계산
+  // 모든 매매 건별(Open/Close 포함) 손익을 기반으로 승률과 PF를 산출합니다.
+  // ---------------------------------------------------------
+  let tradeWin = 0, tradeLoss = 0;
+  let tradeWinSum = 0, tradeLossSum = 0;
+
+  res.processed.forEach(t => {
+    if (t.netPnlKRW > 0) {
+      tradeWin++;
+      tradeWinSum += t.netPnlKRW;
+    } else if (t.netPnlKRW < 0) {
+      tradeLoss++;
+      tradeLossSum += Math.abs(t.netPnlKRW);
+    }
+  });
+
+  const tradeTotal = tradeWin + tradeLoss;
+  const tradeWinRate = tradeTotal > 0 ? ((tradeWin / tradeTotal) * 100).toFixed(1) : "0.0";
+  const tradePF = tradeLossSum > 0 ? (tradeWinSum / tradeLossSum).toFixed(2) : (tradeWinSum > 0 ? "∞" : "0.00");
+
+  // ---------------------------------------------------------
+  // 2. 우측 사이드바: 계좌 자산 및 리스크 지표 업데이트
+  // ---------------------------------------------------------
   const risk = calculateStopRiskSummary(res);
   const margin = calculateMarginSummary(res);
   const initMargin = calculateInitMarginSummary(res);
@@ -803,42 +828,50 @@ function renderAll() {
   const availCashUSD = res.eqOvs - initMargin.initUSD_byUSD;
   const equityTotalKRW = res.eqDom + (res.eqOvs * globalFX);
 
-  // --- [1] 오른쪽 사이드바 (Equity/Risk) 업데이트 ---
+  // 계좌 자산 표시
   document.getElementById('equity-dom').innerText = Math.round(res.eqDom).toLocaleString();
   document.getElementById('equity-ovs').innerText = "$" + res.eqOvs.toLocaleString(undefined, { minimumFractionDigits: 2 });
   document.getElementById('equity-total-krw-side').innerText = Math.round(equityTotalKRW).toLocaleString();
+  
+  // 리스크 지표 표시
   document.getElementById('stop-risk-krw-side').innerText = Math.round(risk.totalStopRiskKRW).toLocaleString() + " KRW";
   document.getElementById('risk-ratio').innerText = (risk.riskRatio * 100).toFixed(1) + "%";
   document.getElementById('margin-alert-side').innerHTML = `<span style="color:${margin.color}; font-weight:bold">${margin.status}</span>`;
+  
+  // 증거금 여유 표시
   document.getElementById('free-krw').innerText = Math.round(margin.freeKRW).toLocaleString() + " KRW";
-  document.getElementById('free-usd').innerText = "$" + (margin.freeUSD).toLocaleString(undefined,{minimumFractionDigits:2});
+  document.getElementById('free-usd').innerText = "$" + (margin.freeUSD).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
-  // --- [2] 중앙 상단 실현손익 업데이트 ---
+  // ---------------------------------------------------------
+  // 3. 중앙 대시보드: 실현 손익 상단 카드 업데이트
+  // ---------------------------------------------------------
   document.getElementById('total-realized-krw').innerText = Math.round(res.netRealizedKRW).toLocaleString();
   const realizedPct = capitals.dom ? (res.netRealizedKRW / capitals.dom) * 100 : 0;
   document.getElementById('total-realized-pct').innerText = realizedPct.toFixed(1) + "%";
 
-  // --- [3] 미실현 손익률(KRW/USD 각각) 계산 로직 ---
+  // ---------------------------------------------------------
+  // 4. 미실현(평가) 손익률 및 가중치 계산
+  // 각 포지션의 규모에 따라 평균적인 수익률(Weighted PnL%)을 계산합니다.
+  // ---------------------------------------------------------
   let weightedUnrealTotal = 0; // 전체(KRW환산) 가중치 합
   let totalBaseTotal = 0;      // 전체 매입금액 합
-
   let weightedUnrealUSD = 0;   // USD 전용 가중치 합
   let totalBaseUSD = 0;        // USD 전용 매입금액 합
-  let totalSumUnrealUSD = 0;   // USD 전용 평가손익(불합)
+  let totalSumUnrealUSD = 0;   // USD 전용 평가손익 합계
 
   res.openPos.forEach(p => {
     if (!p.avgPrice || !p.currPrice) return;
 
     const dir = (p.qty > 0) ? 1 : -1;
     const pct = ((p.currPrice - p.avgPrice) / p.avgPrice) * 100 * dir;
-    const baseValue = Math.abs(p.qty) * p.avgPrice; // 해당 통화 기준 매입가치
+    const baseValue = Math.abs(p.qty) * p.avgPrice; // 해당 통화 기준 매입 가치
 
-    // (A) 전체 기준 누적 (KRW로 환산해서 합산)
+    // (A) 전체 기준 누계 (KRW 환산)
     const baseKRW = (p.cur === "USD") ? baseValue * globalFX : baseValue;
     weightedUnrealTotal += pct * baseKRW;
     totalBaseTotal += baseKRW;
 
-    // (B) 해외(USD) 기준 누적
+    // (B) 해외(USD) 기준 누계
     if (p.cur === "USD") {
       weightedUnrealUSD += pct * baseValue;
       totalBaseUSD += baseValue;
@@ -849,18 +882,17 @@ function renderAll() {
   const unrealPctTotal = totalBaseTotal ? (weightedUnrealTotal / totalBaseTotal) : 0;
   const unrealPctUSD = totalBaseUSD ? (weightedUnrealUSD / totalBaseUSD) : 0;
 
-  // --- [4] 중앙 상단 미실현 손익 UI 업데이트 ---
-  // KRW 카드
+  // 중앙 상단 미실현 손익 UI 업데이트
   document.getElementById('total-unrealized-krw').innerText = Math.round(res.unrealizedKRW).toLocaleString();
   document.getElementById('total-unrealized-pct').innerText = unrealPctTotal.toFixed(1) + "%";
 
-  // USD 카드 (해외 포지션 전용)
   document.getElementById('total-unrealized-usd').innerText = totalSumUnrealUSD.toFixed(2);
   const usdPctEl = document.getElementById('total-unrealized-usd-pct');
-  if(usdPctEl) usdPctEl.innerText = unrealPctUSD.toFixed(1) + "%";
+  if (usdPctEl) usdPctEl.innerText = unrealPctUSD.toFixed(1) + "%";
 
-
-  // --- [5] 나머지 리스크 모니터 및 주문가능현금 업데이트 ---
+  // ---------------------------------------------------------
+  // 5. 증거금 사용률 및 주문 가능 금액 업데이트 (하단 리스크 카드)
+  // ---------------------------------------------------------
   document.getElementById('maint-used-krw').innerText = Math.round(margin.usedKRW_byKRW).toLocaleString() + " KRW";
   document.getElementById('maint-used-usd').innerText = "$" + margin.usedUSD_byUSD.toFixed(2);
   document.getElementById('maint-free-krw').innerText = Math.round(margin.freeKRW).toLocaleString() + " KRW";
@@ -876,29 +908,52 @@ function renderAll() {
   document.getElementById('avail-cash-krw').innerText = Math.round(availCashKRW).toLocaleString() + " KRW";
   document.getElementById('avail-cash-usd').innerText = "$" + availCashUSD.toLocaleString(undefined, { minimumFractionDigits: 2 });
 
-  // --- [6] 퍼포먼스 요약 텍스트 업데이트 ---
+// --- [6] 퍼포먼스 요약 텍스트 업데이트 ---
   document.getElementById('perf-summary').innerHTML = `
-    <div><span style="color:var(--muted)">KRW/USD 실현</span><br>₩${Math.round(res.rKRW_Dom).toLocaleString()} / $${res.rUSD_Ovs.toFixed(2)}</div>
-    <div><span style="color:var(--muted)">KRW/USD 수수료</span><br>₩${Math.round(res.feeKRW_Dom).toLocaleString()} / $${res.feeUSD_Ovs.toFixed(2)}</div>
-<div>
-  <span style="color:var(--muted)">승률 / PF (포지션 기준)</span><br>
-  ${res.posWin + res.posLoss > 0
-    ? ((res.posWin / (res.posWin + res.posLoss)) * 100).toFixed(1)
-    : 0
-  }%
-  /
-  ${res.posLossSum > 0
-    ? (res.posWinSum / res.posLossSum).toFixed(2)
-    : (res.posWinSum > 0 ? '∞' : '0.00')
-  }
-</div>  `;
+    <!-- [첫 번째 칸] 통화별 실현 내역 및 수수료 (가독성 강화) -->
+    <div>
+      <span style="color:var(--muted)">통화별 실현 (수수료)</span><br>
+      <b style="font-size:12px; color:var(--text);">
+        ₩${Math.round(res.rKRW_Dom).toLocaleString()} / $${res.rUSD_Ovs.toFixed(2)}
+      </b><br>
+      <span style="color:var(--bad); font-size:11px; font-weight:bold;">
+        (Fee ₩${Math.round(res.feeKRW_Dom).toLocaleString()} / $${res.feeUSD_Ovs.toFixed(2)})
+      </span>
+    </div>
 
-  // --- [7] 테이블(Active Positions / History) 렌더링 ---
-  renderTables(res, margin); 
+    <!-- [두 번째 칸] 체결 기준 성과 -->
+    <div>
+      <span style="color:var(--muted)">체결 승률 / PF</span><br>
+      <b style="font-size:12px;">${tradeTotal}회 / ${tradeWinRate}%</b><br>
+      <span style="font-size:11px; color:var(--accent);">PF ${tradePF}</span>
+    </div>
 
-  updateAvailContracts(res, margin);
-  runCalc();
+    <!-- [세 번째 칸] 포지션 기준 성과 -->
+    <div>
+      <span style="color:var(--muted)">포지션 승률 / PF</span><br>
+      <b style="font-size:12px;">${res.posWin + res.posLoss}회 /
+      ${
+        res.posWin + res.posLoss > 0
+          ? ((res.posWin / (res.posWin + res.posLoss)) * 100).toFixed(1)
+          : "0.0"
+      }%</b><br>
+      <span style="font-size:11px; color:var(--accent);">PF ${
+        res.posLossSum > 0
+          ? (res.posWinSum / res.posLossSum).toFixed(2)
+          : (res.posWinSum > 0 ? "∞" : "0.00")
+      }</span>
+    </div>
+  `;
+
+  // ---------------------------------------------------------
+  // 7. 기타 UI 갱신: 테이블 및 추가 매수 가능량
+  // ---------------------------------------------------------
+  renderTables(res, margin);      // 포지션 및 히스토리 테이블 재생성
+  updateAvailContracts(res, margin); // 현재 설정된 상품의 추가 매수 가능량 계산
+  runCalc();                      // 틱 가치 계산기 업데이트
 }
+
+
 
 
 
@@ -1551,73 +1606,94 @@ function renderPerformanceReport() {
 
   const res = calculateEngine();
   const processed = res.processed;
+  // 선택한 기간에 해당하는 거래만 필터링
   const filtered = processed.filter(t => (!start || t.date >= start) && (!end || t.date <= end));
 
-  // 기간 내 포지션(청산) 기준 집계
+  // --- [데이터 집계 변수] ---
+  let totalRealized = 0;
+  let totalFee = 0;
+
+  // 체결(Trade) 기준 변수
+  let tWin = 0, tLoss = 0;
+  let tWinSum = 0, tLossSum = 0;
+
+  // 포지션(Position) 기준 변수 (기간 내 청산된 포지션 대상)
   const periodPositionStats = {};
+
+  const body = document.querySelector('#repDetailTable tbody');
+  body.innerHTML = '';
+
   filtered.forEach(t => {
+    // 1. 기본 손익/수수료 누적
+    totalRealized += t.realizedPnlKRW;
+    totalFee += t.feeKRW;
+
+    // 2. 체결 기준 집계 (건별)
+    if (t.netPnlKRW > 0) {
+      tWin++;
+      tWinSum += t.netPnlKRW;
+    } else if (t.netPnlKRW < 0) {
+      tLoss++;
+      tLossSum += Math.abs(t.netPnlKRW);
+    }
+
+    // 3. 포지션 기준 집계를 위한 그룹화
     const key = `${t.asset}_${t.maturity}`;
     if (!periodPositionStats[key]) {
       periodPositionStats[key] = { netPnlKRW: 0, isClosed: false };
     }
     periodPositionStats[key].netPnlKRW += t.netPnlKRW;
     if (t.currentNetQty === 0) periodPositionStats[key].isClosed = true;
-  });
 
-  let totalRealized = 0, totalFee = 0;
-  let winSum = 0, lossSum = 0, winCount = 0, lossCount = 0;
-
-  const body = document.querySelector('#repDetailTable tbody');
-  body.innerHTML = '';
-
-  filtered.forEach(t => {
-    totalRealized += t.realizedPnlKRW;
-    totalFee += t.feeKRW;
-
-    if (t.netPnlKRW > 0) { winSum += t.netPnlKRW; winCount++; }
-    else if (t.netPnlKRW < 0) { lossSum += Math.abs(t.netPnlKRW); lossCount++; }
-
-    // ✅ 상태 추가 (헤더와 맞추기)
-    let statusLabel = 'OPEN';
-    if (t.currentNetQty === 0) statusLabel = 'SQUARED';
-    else if (t.isCloseTrade) statusLabel = 'CLOSE';
-
+    // 4. 테이블 행 추가
+    let statusLabel = t.currentNetQty === 0 ? 'SQUARED' : (t.isCloseTrade ? 'CLOSE' : 'OPEN');
     body.innerHTML += `
       <tr>
         <td>${t.date}</td>
         <td>${t.asset}</td>
-        <td>${t.side}</td>
-        <td>${t.price}</td>
+        <td class="${t.side === 'Buy' ? 'up' : 'down'}">${t.side}</td>
+        <td>${t.price.toLocaleString()}</td>
         <td>${t.qty}</td>
-        <td>${statusLabel}</td>
+        <td><span class="pill">${statusLabel}</span></td>
         <td>${Math.round(t.realizedPnlKRW).toLocaleString()}</td>
-        <td>${Math.round(t.feeKRW).toLocaleString()}</td>
+        <td style="color:var(--bad)">${Math.round(t.feeKRW).toLocaleString()}</td>
         <td><b>${Math.round(t.netPnlKRW).toLocaleString()}</b></td>
         <td class="${t.netPct >= 0 ? 'up' : 'down'}">${t.netPct.toFixed(2)}%</td>
-        <td>${t.memo || '-'}</td>
+        <td class="mono" style="font-size:10px; opacity:0.7;">${t.memo || '-'}</td>
       </tr>`;
   });
 
-  const totalNet = totalRealized - totalFee;
+  // --- [최종 성과 지표 계산] ---
+  
+  // 체결 기준 승률/PF
+  const tTotal = tWin + tLoss;
+  const tWinRate = tTotal > 0 ? ((tWin / tTotal) * 100).toFixed(1) : "0.0";
+  const tPF = tLossSum > 0 ? (tWinSum / tLossSum).toFixed(2) : (tWinSum > 0 ? "∞" : "0.00");
 
-  // ✅ 포지션 기준 승률 / PF
+  // 포지션 기준 승률/PF (청산 완료된 포지션만)
   let pWin = 0, pLoss = 0, pWinSum = 0, pLossSum = 0;
   Object.values(periodPositionStats).forEach(p => {
-    if (!p.isClosed) return;
+    if (!p.isClosed) return; 
     if (p.netPnlKRW > 0) { pWin++; pWinSum += p.netPnlKRW; }
     else if (p.netPnlKRW < 0) { pLoss++; pLossSum += Math.abs(p.netPnlKRW); }
   });
-  const totalPos = pWin + pLoss;
-  const posWinRate = totalPos > 0 ? ((pWin / totalPos) * 100).toFixed(1) : '0.0';
-  const posPF = pLossSum > 0 ? (pWinSum / pLossSum).toFixed(2) : (pWinSum > 0 ? '∞' : '0.00');
+  const pTotal = pWin + pLoss;
+  const pWinRate = pTotal > 0 ? ((pWin / pTotal) * 100).toFixed(1) : "0.0";
+  const pPF = pLossSum > 0 ? (pWinSum / pLossSum).toFixed(2) : (pWinSum > 0 ? "∞" : "0.00");
 
+  // --- [UI 업데이트] ---
   document.getElementById('rep-realized').innerText = Math.round(totalRealized).toLocaleString();
-  document.getElementById('rep-fee').innerText = Math.round(totalFee).toLocaleString();
-  document.getElementById('rep-net').innerText = Math.round(totalNet).toLocaleString();
-  document.getElementById('rep-winrate').innerText = `${totalPos} 포지션 / ${posWinRate}%`;
-  document.getElementById('rep-pf').innerText = posPF;
+  document.getElementById('rep-fee').innerText = "-" + Math.round(totalFee).toLocaleString();
+  document.getElementById('rep-net').innerText = Math.round(totalRealized - totalFee).toLocaleString();
+  
+  // 승률 표시 (체결 / 포지션)
+  document.getElementById('rep-winrate').innerHTML = 
+    `<span style="color:var(--text)">${tWinRate}%</span> <span style="color:var(--muted); font-size:10px;">/</span> <span style="color:var(--accent)">${pWinRate}%</span>`;
+  
+  // PF 표시 (체결 / 포지션)
+  document.getElementById('rep-pf').innerHTML = 
+    `<span style="color:var(--text)">${tPF}</span> <span style="color:var(--muted); font-size:10px;">/</span> <span style="color:var(--accent)">${pPF}</span>`;
 }
-
 
 // 2. ATM 기록 관리
 function addATMRecord() {

@@ -308,13 +308,18 @@
         <button class="btn-blue" onclick="renderPerformanceReport()" style="padding: 8px 30px; width: auto;">조회하기</button>
       </div>
 
-      <div class="summary-grid">
-        <div class="stat-card"><div class="stat-label">기간 실현손익</div><div id="rep-realized" class="stat-val mono">0</div></div>
-        <div class="stat-card"><div class="stat-label">기간 수수료</div><div id="rep-fee" class="stat-val mono">0</div></div>
-        <div class="stat-card"><div class="stat-label">기간 순손익</div><div id="rep-net" class="stat-val mono" style="color:var(--accent)">0</div></div>
-        <div class="stat-card"><div class="stat-label">매매횟수 / 승률</div><div id="rep-winrate" class="stat-val mono">-</div></div>
-        <div class="stat-card"><div class="stat-label">Profit Factor</div><div id="rep-pf" class="stat-val mono">-</div></div>
-      </div>
+<div class="summary-grid">
+  <!-- 1. 기간 실현손익 (수수료 차감 전) -->
+  <div class="stat-card">    <div class="stat-label">기간 실현손익 (Gross)</div>    <div id="rep-realized" class="stat-val mono">0</div>  </div>
+  <!-- 2. 기간 총 수수료 (빨간색 강조) -->
+  <div class="stat-card">    <div class="stat-label">기간 수수료 (Total Fee)</div>    <div id="rep-fee" class="stat-val mono" style="color:var(--bad)">0</div>  </div>
+  <!-- 3. 기간 순손익 (수수료 차감 후) -->
+  <div class="stat-card">    <div class="stat-label">기간 순손익 (Net PnL)</div>    <div id="rep-net" class="stat-val mono" style="color:var(--accent)">0</div>  </div>
+  <!-- 4. 체결/포지션 승률 -->
+  <div class="stat-card">    <div class="stat-label">승률 (체결 / 포지션)</div>    <div id="rep-winrate" class="stat-val mono" style="font-size:13px;">-</div>  </div>
+  <!-- 5. Profit Factor (체결 / 포지션) -->
+  <div class="stat-card">    <div class="stat-label">PF (체결 / 포지션)</div>    <div id="rep-pf" class="stat-val mono" style="font-size:13px;">-</div>  </div>
+</div>
 
       <div class="card">
         <h2>Period Trade History (기간 내 거래 상세)</h2>
