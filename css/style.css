@@ -174,18 +174,13 @@ td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle;
   }
 
 }
-
-
 /* ==================================================
-   📱 MOBILE CSS (RESET & SAFE VERSION)
+   📱 MOBILE CSS (FINAL – PC SAFE)
    ================================================== */
 @media (max-width: 768px) {
 
-  /* ----------------------------------
-     0. 기본 리셋
-     ---------------------------------- */
+  /* ---------- 기본 ---------- */
   html, body {
-    width: 100%;
     overflow-x: hidden;
   }
 
@@ -193,86 +188,59 @@ td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle;
     overflow-y: auto;
   }
 
-  /* ----------------------------------
-     1. HEADER
-     ---------------------------------- */
+  /* ---------- HEADER ---------- */
   header {
-    display: block;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
     padding: 10px 12px;
   }
 
   .header-left {
-    display: block;
+    flex-direction: column;
+    gap: 6px;
     width: 100%;
   }
 
   #fx-container {
-    display: block;
     width: 100%;
-    margin-top: 6px;
+    flex-wrap: wrap;
+    gap: 6px;
   }
 
   #fx-monitor {
-    display: block;
-    width: 100%;
+    flex-wrap: wrap;
     white-space: normal;
-    margin-bottom: 6px;
   }
 
   .price-tag {
-    display: inline-block;
-    margin-right: 6px;
     font-size: 10px;
+    white-space: nowrap;
   }
 
   #sync-bar {
     display: flex;
-    width: 100%;
-    justify-content: space-between;
     gap: 6px;
+    justify-content: space-between;
   }
 
-  /* 헤더 버튼 영역 */
+  /* 헤더 버튼 */
   header > div:last-child {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 6px;
-    margin-top: 6px;
   }
 
-  header > div:last-child button {
-    width: 100%;
-    white-space: nowrap;
-  }
-
-  /* ----------------------------------
-     2. TABS
-     ---------------------------------- */
-  .nav-tabs {
-    overflow-x: auto;
-    white-space: nowrap;
-  }
-
-  .tab-link {
-    padding: 10px 14px;
-    font-size: 12px;
-  }
-
-  /* ----------------------------------
-     3. TAB CONTENT (공통)
-     ---------------------------------- */
+  /* ---------- TABS ---------- */
   .tab-content {
     height: auto !important;
     overflow: visible !important;
   }
 
-  /* ----------------------------------
-     4. DASHBOARD
-     ---------------------------------- */
+  /* ---------- DASHBOARD ---------- */
   #tab-dashboard .main-grid {
     display: block;
-    height: auto !important;
-    padding: 10px;
+    height: auto;
   }
 
   #tab-dashboard .scroll-col {
@@ -281,13 +249,7 @@ td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle;
     margin-bottom: 16px;
   }
 
-  #tab-dashboard .card {
-    margin-bottom: 14px;
-  }
-
-  /* ----------------------------------
-     5. TABLE
-     ---------------------------------- */
+  /* ---------- TABLE ---------- */
   .table-wrap {
     overflow-x: auto;
   }
@@ -296,30 +258,9 @@ td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle;
     min-width: 900px;
   }
 
-  /* ----------------------------------
-     6. ACCOUNT SETTINGS
-     ---------------------------------- */
+  /* ---------- SETTINGS ---------- */
   #tab-settings .report-wrapper {
     display: block;
-    padding: 12px;
-  }
-
-  #tab-settings .scroll-col {
-    width: 100%;
-    margin-bottom: 16px;
-    overflow: visible;
-  }
-
-  #tab-settings .card {
-    padding: 12px;
-    margin-bottom: 12px;
-  }
-
-  #tab-settings input,
-  #tab-settings select,
-  #tab-settings textarea {
-    font-size: 15px;
-    padding: 10px;
   }
 
   #tab-settings table {
@@ -327,122 +268,3 @@ td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle;
   }
 
 }
-
-/* =========================
-   📱 DASHBOARD HARD RESET
-   ========================= */
-@media (max-width: 768px) {
-
-  /* Dashboard 탭 컨테이너 완전 해제 */
-  #tab-dashboard {
-    height: auto !important;
-    overflow: visible !important;
-  }
-
-  #tab-dashboard.tab-content {
-    height: auto !important;
-    overflow: visible !important;
-  }
-
-  /* main-grid를 페이지처럼 */
-  #tab-dashboard .main-grid {
-    display: block !important;
-    height: auto !important;
-  }
-
-  /* 모든 컬럼 보이게 */
-  #tab-dashboard .scroll-col {
-    display: block !important;
-    width: 100% !important;
-    overflow: visible !important;
-  }
-
-}
-
-/* =========================
-   📱 HEADER OVERFLOW FIX (FINAL)
-   ========================= */
-@media (max-width: 768px) {
-
-  /* header 자체 */
-  header {
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
-  /* header 직속 자식들 */
-  header > * {
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
-  /* 내부 주요 컨테이너들 */
-  .header-left,
-  #fx-container,
-  #fx-monitor,
-  #sync-bar {
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
-  /* price-tag이 폭 밀어내는 것 방지 */
-  .price-tag {
-    max-width: 100%;
-    white-space: normal;
-    word-break: break-word;
-  }
-
-  /* 버튼도 폭 제한 */
-  header button {
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
-}
-
-/* =========================
-   📱 MOBILE OVERFLOW FINAL FIX
-   ========================= */
-@media (max-width: 768px) {
-
-  /* ----------------------------------
-     1. SYNC BAR (EXPORT / IMPORT)
-     ---------------------------------- */
-  #sync-bar {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 6px !important;
-    max-width: 100%;
-  }
-
-  #sync-bar > div {
-    min-width: 0 !important;
-    text-align: center;
-    font-size: 10px;
-    line-height: 1.2;
-  }
-
-  #sync-bar b {
-    display: block;
-    white-space: normal;
-  }
-
-  /* ----------------------------------
-     2. ACCOUNT SETTINGS GRID FIX
-     ---------------------------------- */
-  #tab-settings .report-wrapper {
-    display: block !important;
-  }
-
-  #tab-settings .report-wrapper > * {
-    max-width: 100%;
-  }
-
-  /* 혹시 남아 있는 grid/flex 강제 해제 */
-  #tab-settings [style*="grid-template-columns"],
-  #tab-settings [class*="grid"] {
-    grid-template-columns: 1fr !important;
-  }
-
-}
-
