@@ -1848,3 +1848,5 @@ function getSyncStatus(local, imp, exp) {
   // ⚠️ WARN: local 변경 후 export 안 됨
   return 'WARN';
 }
+
+/* 20260208_2103수정 */
