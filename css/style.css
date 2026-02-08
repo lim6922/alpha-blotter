@@ -174,3 +174,53 @@ td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle;
   }
 
 }
+
+
+@media (max-width: 768px) {
+
+  /* =========================
+     ⚙️ ACCOUNT SETTINGS (MOBILE)
+     ========================= */
+
+  /* 전체 wrapper를 1열로 */
+  #tab-settings .report-wrapper {
+    display: block;
+    padding: 12px;
+  }
+
+  /* 좌/우 컬럼 구조 해제 */
+  #tab-settings .scroll-col {
+    width: 100% !important;
+    margin-bottom: 16px;
+  }
+
+  /* 카드 여백 축소 */
+  #tab-settings .card {
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
+  /* 입력 필드: 터치 실수 방지 */
+  #tab-settings input,
+  #tab-settings select,
+  #tab-settings textarea {
+    font-size: 15px;
+    padding: 10px;
+  }
+
+  /* ATM 테이블: 가로 스크롤 */
+  #tab-settings .table-wrap {
+    overflow-x: auto;
+  }
+
+  #tab-settings table {
+    min-width: 600px;
+  }
+
+  /* ATM 관리 버튼 줄바꿈 */
+  #tab-settings button {
+    font-size: 13px;
+    padding: 8px;
+  }
+
+}
