@@ -403,10 +403,9 @@ async function fetchYahooPrice(ySymbol) {
 
   return null;
 }
-
 /**
  * 시세 동기화 메인 함수
- * Promise.all 대신 순차적 루프를 사용하여 프록시 차단을 방지합니다.
+ * 실패하더라도 티커는 무조건 노출하며, 요청 간격을 두어 안정성을 확보합니다.
  */
 async function syncMarketPrices() {
   const btn = document.querySelector('.btn-green');
@@ -418,21 +417,22 @@ async function syncMarketPrices() {
   btn.innerText = "⏳ 시세 요청 중...";
   btn.disabled = true;
 
+  // ySymbol이 설정된 모든 상품 추출
   const assetKeys = Object.keys(master).filter(id => master[id] && master[id].ySymbol);
   let updatedCount = 0;
-  let htmlBuffer = ""; // 화면 깜빡임 방지를 위한 버퍼
+  let htmlBuffer = ""; 
 
   try {
-    // [중요] 순차적으로 하나씩 가져오기 (프록시 안정성 확보)
     for (const id of assetKeys) {
       const price = await fetchYahooPrice(master[id].ySymbol);
-      
+      const m = master[id];
+      const isFX = id === "USDKRW" || m.ySymbol === "KRW=X";
+
       if (price !== null) {
-        const m = master[id];
+        // [성공] 시세 업데이트
         updatedCount++;
 
-        // 환율 정보 업데이트
-        if (id === "USDKRW" || m.ySymbol === "KRW=X") {
+        if (isFX) {
           globalFX = price;
           localStorage.setItem('blotter_fx_v96', String(globalFX));
         }
@@ -440,45 +440,45 @@ async function syncMarketPrices() {
         // 최신가 저장
         mtmPrices[`LAST_${id}`] = price;
 
-        // 화면 표시용 태그 생성
-        const isFX = id === "USDKRW";
+        // 정상 표시 (흰색/노란색)
         htmlBuffer += `<span class="price-tag" style="color:${isFX ? 'var(--warn)' : 'var(--text)'}">${id} ${price.toFixed(2)}</span>`;
       } else {
-        // 만약 이번에 가져오기 실패했다면 기존에 저장된 값이 있는지 확인하여 유지
+        // [실패] 시세 획득 실패 시에도 티커는 표시
         const prevPrice = mtmPrices[`LAST_${id}`];
-        if (prevPrice) {
-          htmlBuffer += `<span class="price-tag" style="opacity:0.5;">${id} ${prevPrice.toFixed(2)}?</span>`;
-        }
+        const displayPrice = prevPrice ? Number(prevPrice).toFixed(2) : "---";
+        
+        // 실패 상태 표시 (회색/반투명)
+        htmlBuffer += `<span class="price-tag" style="color:var(--muted); opacity:0.6;" title="시세 갱신 실패">${id} ${displayPrice}</span>`;
       }
       
-      // 요청 간에 200ms 휴식 (프록시 서버 보호 및 안정성)
+      // 요청 간격 (안정성)
       await sleep(100);
     }
 
-    // 결과 화면 반영
-    monitor.innerHTML = htmlBuffer || '<span style="font-size:10px; color:var(--muted);">시세 응답 없음</span>';
+    // 결과 화면 반영 (중간에 실패했어도 버퍼에 쌓인 티커들이 모두 출력됨)
+    monitor.innerHTML = htmlBuffer || '<span style="font-size:10px; color:var(--muted);">대상 상품 없음</span>';
 
     // ================================
-    // [Active Positions] 현재가 일괄 업데이트
+    // [Active Positions] 현재가 덮어쓰기
     // ================================
     const res = calculateEngine();
     res.openPos.forEach(p => {
       const last = mtmPrices[`LAST_${p.asset}`];
       if (last != null) {
-        mtmPrices[p.key] = last; // 포지션별 MTM 가격 갱신
+        mtmPrices[p.key] = last; 
       }
     });
 
     localStorage.setItem('blotter_mtm_v96', JSON.stringify(mtmPrices));
     
-    // 입력창 자동 입력 (현재 선택된 자산 기준)
+    // 현재 선택 상품 입력창 자동 완성
     const currentAsset = document.getElementById('asset').value;
     if (mtmPrices[`LAST_${currentAsset}`]) {
         document.getElementById('price').value = mtmPrices[`LAST_${currentAsset}`];
     }
 
     const now = new Date().toLocaleTimeString();
-    syncDisplay.innerText = updatedCount > 0 ? `최근 갱신: ${now}` : "일부 갱신 실패";
+    syncDisplay.innerText = updatedCount === assetKeys.length ? `전체 갱신 완료: ${now}` : `일부 갱신 (${updatedCount}/${assetKeys.length}): ${now}`;
     
     renderAll(); 
     runCalc();   
@@ -491,8 +491,6 @@ async function syncMarketPrices() {
     btn.disabled = false;
   }
 }
-
-
 
 /**
  * =========================
