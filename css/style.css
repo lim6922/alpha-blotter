@@ -113,119 +113,64 @@ td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle;
    ========================= */
 @media (max-width: 768px) {
 
-  /* 1️⃣ 3열 → 1열 */
-  .main-grid {
-    display: flex !important;
-    flex-direction: column;
-  }
-
-  /* 2️⃣ 각 컬럼 전체폭 */
-  .scroll-col {
-    width: 100% !important;
-    max-width: 100% !important;
-    margin-bottom: 16px;
-  }
-
-  /* 3️⃣ 카드 간 여백 */
-  .card {
-    margin-bottom: 14px;
-  }
-
-  /* 4️⃣ 테이블만 가로 스크롤 */
-  .table-wrap {
-    overflow-x: auto;
-  }
-
-  table {
-    min-width: 900px;
-  }
-
-  /* 5️⃣ 입력 요소 가독성 */
-  input,
-  select,
-  textarea,
-  button {
-    font-size: 14px;
-  }
-
-}
-
-
-
-@media (max-width: 768px) {
-
-  /* 🔥 전체 스크롤 복구 */
-  body {
-    overflow: auto !important;
-  }
-
-  /* 🔥 탭 콘텐츠 높이 고정 해제 */
-  .tab-content {
-    height: auto !important;
-    overflow: visible !important;
-  }
-
-  /* 🔥 컬럼별 스크롤 제거 */
-  .scroll-col {
-    overflow-y: visible !important;
-  }
-
-}
-
-@media (max-width: 768px) {
-
-  /* 🔥 main-grid 높이 고정 해제 (핵심) */
-  .main-grid {
-    height: auto !important;
-  }
-
-}
-
-@media (max-width: 768px) {
-
-  /* 🔒 가로 스크롤 차단 */
-  body {
+  /* 🔒 가로 스크롤 완전 차단 */
+  html, body {
     overflow-x: hidden !important;
   }
 
-  /* 🔄 header 전체 줄바꿈 허용 */
+  /* 📱 header를 세로 레이아웃으로 */
   header {
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
     gap: 6px;
   }
 
-  /* 📦 왼쪽 영역 세로 스택 */
+  /* 왼쪽 영역도 세로 */
   .header-left {
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
     gap: 6px;
-  }
-
-  /* 📊 FX 컨테이너 줄바꿈 */
-  #fx-container {
-    flex-wrap: wrap;
     width: 100%;
   }
 
-  /* 🧾 시세 태그 줄바꿈 허용 */
+  /* FX 컨테이너는 한 줄이 아니라 여러 줄 */
+  #fx-container {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* 시세 태그는 반드시 보이게 */
   #fx-monitor {
+    width: 100%;
     flex-wrap: wrap;
     white-space: normal;
+    justify-content: flex-start;
   }
 
-  /* ⏱ sync bar 폭 제한 */
+  .price-tag {
+    font-size: 10px;
+  }
+
+  /* sync-bar는 가로 꽉 */
   #sync-bar {
     width: 100%;
-    gap: 10px;
     justify-content: space-between;
+    gap: 8px;
   }
 
-  /* 버튼 영역도 줄바꿈 */
+  /* 🔥 버튼 영역도 세로로 */
   header > div:last-child {
+    width: 100%;
+    display: flex;
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: space-between;
     gap: 6px;
+  }
+
+  header > div:last-child button {
+    flex: 1 1 calc(50% - 6px);
+    white-space: nowrap;
   }
 
 }
-
-
