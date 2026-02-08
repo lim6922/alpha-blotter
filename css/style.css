@@ -328,4 +328,33 @@ td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle;
 
 }
 
+/* =========================
+   📱 DASHBOARD HARD RESET
+   ========================= */
+@media (max-width: 768px) {
 
+  /* Dashboard 탭 컨테이너 완전 해제 */
+  #tab-dashboard {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  #tab-dashboard.tab-content {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* main-grid를 페이지처럼 */
+  #tab-dashboard .main-grid {
+    display: block !important;
+    height: auto !important;
+  }
+
+  /* 모든 컬럼 보이게 */
+  #tab-dashboard .scroll-col {
+    display: block !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+}
