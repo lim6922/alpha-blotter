@@ -181,3 +181,51 @@ td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle;
 
 }
 
+@media (max-width: 768px) {
+
+  /* 🔒 가로 스크롤 차단 */
+  body {
+    overflow-x: hidden !important;
+  }
+
+  /* 🔄 header 전체 줄바꿈 허용 */
+  header {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* 📦 왼쪽 영역 세로 스택 */
+  .header-left {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* 📊 FX 컨테이너 줄바꿈 */
+  #fx-container {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  /* 🧾 시세 태그 줄바꿈 허용 */
+  #fx-monitor {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  /* ⏱ sync bar 폭 제한 */
+  #sync-bar {
+    width: 100%;
+    gap: 10px;
+    justify-content: space-between;
+  }
+
+  /* 버튼 영역도 줄바꿈 */
+  header > div:last-child {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+}
+
+
