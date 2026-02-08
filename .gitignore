@@ -1,0 +1,9 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# local backups
+*.csv
+
+# temp / logs
+*.log
