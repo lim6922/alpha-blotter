@@ -159,6 +159,17 @@ td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle;
     gap: 8px;
   }
 
+/* PC 기본 */
+.sync-bar {
+  display: flex;
+  gap: 24px;
+  background: rgba(255,255,255,0.06);
+  padding: 6px 14px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+
+
   /* 🔥 버튼 영역도 세로로 */
   header > div:last-child {
     width: 100%;
@@ -268,3 +279,14 @@ td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle;
   }
 
 }
+
+/* 모바일 */
+@media (max-width: 768px) {
+  .sync-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    margin-left: 0;
+  }
+}
+
