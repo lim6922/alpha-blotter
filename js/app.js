@@ -452,7 +452,7 @@ async function syncMarketPrices() {
       }
       
       // 요청 간에 200ms 휴식 (프록시 서버 보호 및 안정성)
-      await sleep(200);
+      await sleep(100);
     }
 
     // 결과 화면 반영
@@ -1875,4 +1875,4 @@ function getSyncStatus(local, imp, exp) {
   return 'WARN';
 }
 
-/* 20260208_2103수정 */
+//* 20260208_2121수정 *//
