@@ -358,3 +358,45 @@ td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle;
   }
 
 }
+
+/* =========================
+   📱 HEADER OVERFLOW FIX (FINAL)
+   ========================= */
+@media (max-width: 768px) {
+
+  /* header 자체 */
+  header {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* header 직속 자식들 */
+  header > * {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* 내부 주요 컨테이너들 */
+  .header-left,
+  #fx-container,
+  #fx-monitor,
+  #sync-bar {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* price-tag이 폭 밀어내는 것 방지 */
+  .price-tag {
+    max-width: 100%;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  /* 버튼도 폭 제한 */
+  header button {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+}
+
