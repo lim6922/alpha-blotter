@@ -48,15 +48,21 @@ header {
 #fx-container {
     display: flex;
     align-items: center;
+    flex: 1 1 420px;
     gap: 12px;
     background: rgba(255, 255, 255, 0.03);
     padding: 4px 12px;
     border-radius: 20px;
     border: 1px solid var(--line);
-    overflow: hidden;
+    overflow: visible;
     min-width: 280px;
     max-width: 100%;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
+}
+
+#sync-bar {
+    margin-left: 0 !important;
+    flex-shrink: 0;
 }
 
 #fx-monitor {
@@ -87,11 +93,21 @@ header {
    ========================================================================= */
 .header-actions {
     display: flex;
-    width: 100%;
+    flex-direction: column;
+    flex: 0 1 auto;
     justify-content: flex-end;
-    align-items: center;
-    flex-wrap: wrap;
+    align-items: flex-end;
+    flex-wrap: nowrap;
     gap: 10px;
+}
+    gap: 10px;
+}
+
+.header-actions-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .header-tool-single {
@@ -409,14 +425,14 @@ button {
     #sync-bar { width: 100%; justify-content: space-between; margin-left: 0; display: grid; grid-template-columns: 1fr 1fr 1fr; }
 
     .header-actions {
-    display: flex;
-    width: auto;
-    flex: 0 0 auto;
-    justify-content: flex-end;
-    align-items: center;
-    flex-wrap: nowrap;
-    gap: 10px;
-}
+        width: 100%;
+        align-items: stretch;
+        gap: 6px;
+    }
+
+    .header-actions-row {
+        justify-content: flex-start;
+    }
 
     .header-tool-single {
         padding-top: 0;
