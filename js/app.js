@@ -443,7 +443,7 @@ async function exportToCloud() {
   if (!user) return;
 
   const confirmed = confirm(
-    "현재 데이터 원격 동기화 데이터로 저장합니다.\n기존 원격 데이터는 덮어써질 수 있습니다.\n계속하시겠습니까?"
+    "현재 데이터를 원격 동기화 데이터로 저장합니다.\n기존 원격 데이터는 덮어써질 수 있습니다.\n계속하시겠습니까?"
   );
   if (!confirmed) return;
 
