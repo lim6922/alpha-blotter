@@ -442,11 +442,12 @@ async function exportToCloud() {
   const user = await getCurrentUserOrAlert();
   if (!user) return;
 
-  const confirmed = confirm("현재 데이터를 Supabase에 덮어써서 내보내시겠습니까?");
+  const confirmed = confirm(
+    "현재 브라우저의 매매기록 / 입출금 / 상품설정 / 계좌원금을 원격 동기화 데이터로 저장합니다.\n기존 원격 데이터는 덮어써질 수 있습니다.\n계속하시겠습니까?"
+  );
   if (!confirmed) return;
 
   try {
-    // 1) trades: 기존 사용자 데이터 삭제
     const { error: delTradesError } = await supabaseClient
       .from('trades')
       .delete()
@@ -454,7 +455,6 @@ async function exportToCloud() {
 
     if (delTradesError) throw delTradesError;
 
-    // 2) trades: 현재 메모리 데이터 삽입
     if (trades.length > 0) {
       const tradeRows = trades.map(t => ({
         user_id: user.id,
@@ -479,7 +479,6 @@ async function exportToCloud() {
       if (insTradesError) throw insTradesError;
     }
 
-    // 3) atm_records: 기존 사용자 데이터 삭제
     const { error: delAtmError } = await supabaseClient
       .from('atm_records')
       .delete()
@@ -487,7 +486,6 @@ async function exportToCloud() {
 
     if (delAtmError) throw delAtmError;
 
-    // 4) atm_records: 현재 데이터 삽입
     if (atmRecords.length > 0) {
       const atmRows = atmRecords.map(r => ({
         user_id: user.id,
@@ -505,7 +503,6 @@ async function exportToCloud() {
       if (insAtmError) throw insAtmError;
     }
 
-    // 5) asset_master: 기존 사용자 데이터 삭제
     const { error: delMasterError } = await supabaseClient
       .from('asset_master')
       .delete()
@@ -513,7 +510,6 @@ async function exportToCloud() {
 
     if (delMasterError) throw delMasterError;
 
-    // 6) asset_master: master 객체를 row 배열로 변환 후 삽입
     const masterRows = Object.keys(master).map(assetCode => {
       const m = master[assetCode];
       return {
@@ -541,7 +537,6 @@ async function exportToCloud() {
       if (insMasterError) throw insMasterError;
     }
 
-    // 7) capitals: 사용자당 1행이므로 upsert
     const { error: capitalsError } = await supabaseClient
       .from('capitals')
       .upsert({
@@ -553,11 +548,9 @@ async function exportToCloud() {
 
     if (capitalsError) throw capitalsError;
 
-    // 8) meta 저장 전 export 시각 반영
     blotterMeta.lastExportedInputAt = blotterMeta.lastLocalInputAt;
     saveMeta();
 
-    // 9) blotter_meta: 사용자당 1행이므로 upsert
     const { error: metaError } = await supabaseClient
       .from('blotter_meta')
       .upsert({
