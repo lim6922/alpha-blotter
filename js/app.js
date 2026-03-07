@@ -415,77 +415,292 @@ async function syncLogin() {
   }
 }
 
-function ensureSyncAuth() {
-  if (!syncAuth.gistId || !syncAuth.token) {
-    alert("먼저 로그인 버튼으로 GitHub 동기화 정보를 설정하세요.");
-    return false;
-  }
-  return true;
-}
 
 async function exportToCloud() {
-  if (!ensureSyncAuth()) return;
+  const user = await getCurrentUserOrAlert();
+  if (!user) return;
 
-  const csv = buildCSVSnapshot();
-  const response = await fetch(`https://api.github.com/gists/${syncAuth.gistId}`, {
-    method: "PATCH",
-    headers: {
-      "Authorization": `token ${syncAuth.token}`,
-      "Accept": "application/vnd.github+json",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      description: "alpha-blotter sync",
-      files: {
-        "alpha-blotter-sync.csv": {
-          content: csv
-        }
-      }
-    })
-  });
+  try {
+    // 1) trades: 기존 사용자 데이터 삭제
+    const { error: delTradesError } = await supabaseClient
+      .from('trades')
+      .delete()
+      .eq('user_id', user.id);
 
-  if (!response.ok) {
-    alert(`동기화 내보내기 실패: ${response.status}`);
-    return;
+    if (delTradesError) throw delTradesError;
+
+    // 2) trades: 현재 메모리 데이터 삽입
+    if (trades.length > 0) {
+      const tradeRows = trades.map(t => ({
+        user_id: user.id,
+        trade_id: t.id,
+        date: t.date,
+        asset: t.asset,
+        maturity: t.maturity || null,
+        side: t.side,
+        price: t.price,
+        qty: t.qty,
+        fx_rate: t.fxRate,
+        stop_loss: t.stopLoss,
+        memo: t.memo || "",
+        created_at: toISOStringSafeFromMillis(t.createdAt),
+        updated_at: toISOStringSafeFromMillis(t.updatedAt)
+      }));
+
+      const { error: insTradesError } = await supabaseClient
+        .from('trades')
+        .insert(tradeRows);
+
+      if (insTradesError) throw insTradesError;
+    }
+
+    // 3) atm_records: 기존 사용자 데이터 삭제
+    const { error: delAtmError } = await supabaseClient
+      .from('atm_records')
+      .delete()
+      .eq('user_id', user.id);
+
+    if (delAtmError) throw delAtmError;
+
+    // 4) atm_records: 현재 데이터 삽입
+    if (atmRecords.length > 0) {
+      const atmRows = atmRecords.map(r => ({
+        user_id: user.id,
+        record_id: r.id,
+        acc: r.acc,
+        date: r.date,
+        amt: r.amt,
+        memo: r.memo || ""
+      }));
+
+      const { error: insAtmError } = await supabaseClient
+        .from('atm_records')
+        .insert(atmRows);
+
+      if (insAtmError) throw insAtmError;
+    }
+
+    // 5) asset_master: 기존 사용자 데이터 삭제
+    const { error: delMasterError } = await supabaseClient
+      .from('asset_master')
+      .delete()
+      .eq('user_id', user.id);
+
+    if (delMasterError) throw delMasterError;
+
+    // 6) asset_master: master 객체를 row 배열로 변환 후 삽입
+    const masterRows = Object.keys(master).map(assetCode => {
+      const m = master[assetCode];
+      return {
+        user_id: user.id,
+        asset_code: assetCode,
+        symbol: m.symbol || "",
+        y_symbol: m.ySymbol || "",
+        tick: m.tick || 0,
+        tick_val: m.tickVal || 0,
+        fee: m.fee || 0,
+        cur: m.cur || "USD",
+        margin_type: m.marginType || "FIXED",
+        init_margin: m.initMargin || 0,
+        maint_margin: m.maintMargin || 0,
+        multiplier: m.multiplier || 0,
+        description: m.desc || ""
+      };
+    });
+
+    if (masterRows.length > 0) {
+      const { error: insMasterError } = await supabaseClient
+        .from('asset_master')
+        .insert(masterRows);
+
+      if (insMasterError) throw insMasterError;
+    }
+
+    // 7) capitals: 사용자당 1행이므로 upsert
+    const { error: capitalsError } = await supabaseClient
+      .from('capitals')
+      .upsert({
+        user_id: user.id,
+        dom: capitals.dom || 0,
+        ovs: capitals.ovs || 0,
+        updated_at: new Date().toISOString()
+      });
+
+    if (capitalsError) throw capitalsError;
+
+    // 8) meta 저장 전 export 시각 반영
+    blotterMeta.lastExportedInputAt = blotterMeta.lastLocalInputAt;
+    saveMeta();
+
+    // 9) blotter_meta: 사용자당 1행이므로 upsert
+    const { error: metaError } = await supabaseClient
+      .from('blotter_meta')
+      .upsert({
+        user_id: user.id,
+        last_local_input_at: blotterMeta.lastLocalInputAt || null,
+        last_imported_input_at: blotterMeta.lastImportedInputAt || null,
+        last_exported_input_at: blotterMeta.lastExportedInputAt || null,
+        updated_at: new Date().toISOString()
+      });
+
+    if (metaError) throw metaError;
+
+    updateSyncHeader();
+    alert("동기화 내보내기가 완료되었습니다.");
+  } catch (error) {
+    console.error(error);
+    alert("동기화 내보내기 실패: " + error.message);
   }
-	
- blotterMeta.lastExportedInputAt = blotterMeta.lastLocalInputAt;
-  saveMeta();
-  updateSyncHeader();
-  alert("동기화 내보내기가 완료되었습니다.");
 }
 
 async function importFromCloud() {
-  if (!ensureSyncAuth()) return;
+  const user = await getCurrentUserOrAlert();
+  if (!user) return;
 
-  const response = await fetch(`https://api.github.com/gists/${syncAuth.gistId}`, {
-    method: "GET",
-    headers: {
-      "Authorization": `token ${syncAuth.token}`,
-      "Accept": "application/vnd.github+json"
+  try {
+    // 1) trades 조회
+    const { data: tradeRows, error: tradeError } = await supabaseClient
+      .from('trades')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('date', { ascending: true });
+
+    if (tradeError) throw tradeError;
+
+    // 2) atm_records 조회
+    const { data: atmRows, error: atmError } = await supabaseClient
+      .from('atm_records')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('date', { ascending: false });
+
+    if (atmError) throw atmError;
+
+    // 3) asset_master 조회
+    const { data: masterRows, error: masterError } = await supabaseClient
+      .from('asset_master')
+      .select('*')
+      .eq('user_id', user.id);
+
+    if (masterError) throw masterError;
+
+    // 4) capitals 조회 (사용자당 1행)
+    const { data: capitalRow, error: capitalError } = await supabaseClient
+      .from('capitals')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (capitalError) throw capitalError;
+
+    // 5) blotter_meta 조회 (사용자당 1행)
+    const { data: metaRow, error: metaError } = await supabaseClient
+      .from('blotter_meta')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (metaError) throw metaError;
+
+    // 6) Supabase rows -> 앱 구조로 변환
+    const remoteTrades = (tradeRows || []).map(r => ({
+      id: r.trade_id || r.id,
+      date: r.date,
+      asset: r.asset,
+      maturity: r.maturity || "",
+      side: r.side,
+      price: Number(r.price),
+      qty: Number(r.qty),
+      fxRate: Number(r.fx_rate),
+      stopLoss: r.stop_loss != null ? Number(r.stop_loss) : null,
+      memo: r.memo || "",
+      createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
+      updatedAt: r.updated_at ? new Date(r.updated_at).getTime() : Date.now()
+    }));
+
+    const remoteATM = (atmRows || []).map(r => ({
+      id: r.record_id || r.id,
+      acc: r.acc,
+      date: r.date,
+      amt: Number(r.amt),
+      memo: r.memo || ""
+    }));
+
+    const remoteMaster = {};
+    (masterRows || []).forEach(r => {
+      remoteMaster[r.asset_code] = {
+        symbol: r.symbol || "",
+        ySymbol: r.y_symbol || "",
+        tick: Number(r.tick || 0),
+        tickVal: Number(r.tick_val || 0),
+        fee: Number(r.fee || 0),
+        cur: r.cur || "USD",
+        marginType: r.margin_type || "FIXED",
+        initMargin: Number(r.init_margin || 0),
+        maintMargin: Number(r.maint_margin || 0),
+        multiplier: Number(r.multiplier || 0),
+        desc: r.description || ""
+      };
+    });
+
+    // 7) 원격 데이터 존재 여부 체크
+    const hasTrades = remoteTrades.length > 0;
+    const hasATM = remoteATM.length > 0;
+    const hasMaster = Object.keys(remoteMaster).length > 0;
+    const hasCapitals = !!capitalRow;
+
+    if (!(hasTrades || hasATM || hasMaster || hasCapitals)) {
+      alert("동기화 데이터가 없습니다.");
+      return;
     }
-  });
 
-  if (!response.ok) {
-    alert(`동기화 가져오기 실패: ${response.status}`);
-    return;
+    // 8) 덮어쓰기 확인
+    const msg = `동기화 데이터를 발견했습니다:
+- 매매: ${remoteTrades.length}건
+- 입출금: ${remoteATM.length}건
+- 상품설정: ${Object.keys(remoteMaster).length}건
+
+기존 데이터를 덮어쓰시겠습니까?`;
+
+    if (!confirm(msg)) return;
+
+    // 9) 현재 메모리 상태 교체
+    trades = remoteTrades;
+    atmRecords = remoteATM;
+
+    if (hasMaster) {
+      master = remoteMaster;
+    }
+
+    capitals = {
+      dom: Number(capitalRow?.dom || 0),
+      ovs: Number(capitalRow?.ovs || 0)
+    };
+
+    blotterMeta.lastImportedInputAt = metaRow?.last_local_input_at || Date.now();
+    blotterMeta.lastLocalInputAt = metaRow?.last_local_input_at || Date.now();
+    blotterMeta.lastExportedInputAt = metaRow?.last_exported_input_at || null;
+
+    // 10) localStorage 캐시도 갱신
+    localStorage.setItem('blotter_trades_v96', JSON.stringify(trades));
+    localStorage.setItem('blotter_atm_v96', JSON.stringify(atmRecords));
+    localStorage.setItem('blotter_master_v96', JSON.stringify(master));
+    localStorage.setItem('blotter_capitals_v96', JSON.stringify(capitals));
+    localStorage.setItem('blotter_meta_v96', JSON.stringify(blotterMeta));
+
+    // 11) UI 반영
+    loadCapitals();
+    renderMaster();
+    initAssetSelect();
+    renderATM();
+    renderAll();
+    updateSyncHeader();
+
+    alert("동기화 가져오기가 완료되었습니다.");
+  } catch (error) {
+    console.error(error);
+    alert("동기화 가져오기 실패: " + error.message);
   }
-
-  const gist = await response.json();
-  const file = gist?.files?.['alpha-blotter-sync.csv'] || Object.values(gist?.files || {}).find(f => f?.filename?.endsWith('.csv'));
-  if (!file || !file.raw_url) {
-    alert("Gist에서 CSV 파일을 찾지 못했습니다.");
-    return;
-  }
-
-  const csvRes = await fetch(file.raw_url);
-  if (!csvRes.ok) {
-    alert(`CSV 다운로드 실패: ${csvRes.status}`);
-    return;
-  }
-
-  const csvText = await csvRes.text();
-  parseAndApplyCSV(csvText, "동기화");
 }
 
 /**
@@ -1726,9 +1941,11 @@ window.onload = async () => {
   loadCapitals();
 
   document.getElementById('tradeDate').value = new Date().toISOString().split('T')[0];
-  if(!document.getElementById('maturityDate').value){
+
+  if (!document.getElementById('maturityDate').value) {
     document.getElementById('maturityDate').value = new Date().toISOString().split('T')[0];
   }
+
   syncDTEFromMaturity();
 
   renderATM();
@@ -1736,7 +1953,15 @@ window.onload = async () => {
   renderAll();
   syncMarketPrices();
   updateSyncHeader();
+
   await updateSyncAuthUI();
+
+  const { data, error } = await supabaseClient.auth.getSession();
+  if (error) {
+    console.error("Supabase session restore failed:", error.message);
+  } else if (data?.session) {
+    console.log("Supabase session restored:", data.session.user?.email || data.session.user?.id);
+  }
 };
 
 
