@@ -40,7 +40,7 @@ header {
     display: flex;
     align-items: center;
     gap: 16px;
-    flex: 1 1 auto;
+    flex: 1 1 68%;
     min-width: 0;
 }
 
@@ -48,14 +48,14 @@ header {
 #fx-container {
     display: flex;
     align-items: center;
-    flex: 1 1 540px;
+    flex: 1 1 720px;
     gap: 12px;
     background: rgba(255, 255, 255, 0.03);
     padding: 8px 12px;
     border-radius: 20px;
     border: 1px solid var(--line);
     overflow: visible;
-    min-width: 360px;
+    min-width: 500px;
     max-width: 100%;
     flex-wrap: nowrap;
 }
@@ -113,19 +113,18 @@ header {
    ========================================================================= */
 .header-actions {
     display: flex;
-    flex-direction: column;
-    flex: 0 1 auto;
+    flex: 0 0 auto;
     justify-content: flex-end;
-    align-items: flex-end;
-    flex-wrap: nowrap;
-    gap: 10px;
+    align-items: center;
+    min-width: max-content;
 }
 
 .header-actions-row {
     display: flex;
     gap: 6px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: flex-end;
+    align-items: center;
 }
 
 .header-tool-single {
