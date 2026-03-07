@@ -147,53 +147,206 @@ function getTimestamp() {
     + String(now.getMinutes()).padStart(2, '0');
 }
 
-function exportToCSV() {
+const SYNC_AUTH_STORAGE_KEY = "blotter_sync_auth_v96";
+let syncAuth = JSON.parse(localStorage.getItem(SYNC_AUTH_STORAGE_KEY)) || {
+  provider: "github",
+  gistId: "",
+  token: ""
+};
 
-  // --- META ---
+function saveSyncAuth() {
+  localStorage.setItem(SYNC_AUTH_STORAGE_KEY, JSON.stringify(syncAuth));
+  updateSyncAuthUI();
+}
+
+function updateSyncAuthUI() {
+  const el = document.getElementById('sync-auth-status');
+  if (!el) return;
+  if (syncAuth.gistId && syncAuth.token) {
+    el.innerText = `로그인됨 · Gist ${syncAuth.gistId.slice(0, 6)}...`;
+    el.classList.remove('sync-auth-off');
+    el.classList.add('sync-auth-on');
+  } else {
+    el.innerText = '로그인 필요';
+    el.classList.remove('sync-auth-on');
+    el.classList.add('sync-auth-off');
+  }
+}
+
+function buildCSVSnapshot() {
   let csv = "---META---\nLAST_LOCAL_INPUT_AT\n";
   csv += `${blotterMeta.lastLocalInputAt || ""}\n\n`;
-
-  // --- TRADES ---
-
+	
   csv += "---TRADES---\nDate,Asset,Maturity,Side,Price,Qty,FXRate,StopLoss,Memo,CreatedAt,UpdatedAt\n";
-trades.forEach(t => {
-  const memo = (t.memo || "")
-  .replace(/\r?\n/g, "\\n")   // 줄바꿈 안전 처리
-  .replace(/"/g,'""');       // 따옴표 escape
-  csv += `${t.date},${t.asset},${t.maturity},${t.side},${t.price},${t.qty},${t.fxRate},${t.stopLoss ?? ""},"${memo}",${t.createdAt},${t.updatedAt}\n`;
-});
+  trades.forEach(t => {
+    const memo = (t.memo || "")
+      .replace(/\r?\n/g, "\\n")
+      .replace(/"/g,'""');
+    csv += `${t.date},${t.asset},${t.maturity},${t.side},${t.price},${t.qty},${t.fxRate},${t.stopLoss ?? ""},"${memo}",${t.createdAt},${t.updatedAt}\n`;
+  });
 
-  // 2. 상품 마스터 섹션
   csv += "\n---MASTER---\nAsset,Symbol,YSymbol,Tick,TickVal,Fee,Cur,MarginType,InitMargin,MaintMargin,Multiplier,Desc\n";
   Object.keys(master).forEach(k => {
     const m = master[k];
     csv += `${k},${m.symbol||""},${m.ySymbol||""},${m.tick},${m.tickVal},${m.fee},${m.cur},${m.marginType||"FIXED"},${m.initMargin||0},${m.maintMargin||0},${m.multiplier||0},"${(m.desc||"")
-  .replace(/\r?\n/g,"\\n")
-  .replace(/"/g,'""')}"\n`;
+      .replace(/\r?\n/g,"\\n")
+      .replace(/"/g,'""')}"\n`;
   });
 
-  // 3. ATM(입출금) 섹션
   csv += "\n---ATM---\nDate,Account,Amount,Memo\n";
   atmRecords.forEach(r => {
-    const memo = (r.memo || "").replace(/"/g, '""');
+    const memo = (r.memo || "")
+      .replace(/\r?\n/g, "\\n")
+      .replace(/"/g, '""');
     csv += `${r.date},${r.acc},${r.amt},"${memo}"\n`;
   });
 
-  // 4. 초기 자본금 섹션 (추가됨)
   csv += "\n---CAPITALS---\nDOM_KRW,OVS_USD\n";
   csv += `${capitals.dom},${capitals.ovs}\n`;
 
+    return csv;
+}
+
+function downloadCSV(csv, fileName) {
   const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement("a");
   link.setAttribute("href", URL.createObjectURL(blob));
-  link.setAttribute("download", `AlphaBlotter_v96_FullBackup_${getTimestamp()}.csv`);
+  link.setAttribute("download", fileName);
   link.click();
+}
 
-// EXPORT는 "데이터 생성 시점"을 기록해야 함
-blotterMeta.lastExportedInputAt = blotterMeta.lastLocalInputAt;
-saveMeta();
-updateSyncHeader();
+function exportToCSV() {
+  const csv = buildCSVSnapshot();
+  downloadCSV(csv, `AlphaBlotter_v96_FullBackup_${getTimestamp()}.csv`);
 
+  blotterMeta.lastExportedInputAt = blotterMeta.lastLocalInputAt;
+  saveMeta();
+  updateSyncHeader();
+}
+
+function parseAndApplyCSV(text, sourceLabel = "CSV") {
+  const normalizedText = text.replace(/^\uFEFF/, "");
+  const rows = normalizedText.split(/\r?\n/);
+  const newTrades = [];
+  const newATM = [];
+  const newMaster = {};
+  let newCapitals = { dom: 0, ovs: 0 };
+  let csvLocalInputAt = null;
+  let currentSection = "";
+
+  rows.forEach((row) => {
+    const tr = row.trim();
+    if (!tr) return;
+
+    if (tr === "---META---") { currentSection = "META"; return; }
+    if (tr === "---TRADES---") { currentSection = "TRADES"; return; }
+    if (tr === "---MASTER---") { currentSection = "MASTER"; return; }
+    if (tr === "---ATM---") { currentSection = "ATM"; return; }
+    if (tr === "---CAPITALS---") { currentSection = "CAPITALS"; return; }
+
+    if (tr.startsWith("Date,Asset,") || tr.startsWith("Asset,Symbol,") ||
+        tr.startsWith("Date,Account,") || tr.startsWith("DOM_KRW,") ||
+        tr === "LAST_LOCAL_INPUT_AT") return;
+
+    if (currentSection === "META") {
+      csvLocalInputAt = parseInt(tr, 10) || null;
+      return;
+    }
+
+    const parts = parseCSVLine(tr);
+
+    if (currentSection === "TRADES" && parts.length >= 10) {
+      newTrades.push({
+        id: parts[9] ? parseInt(parts[9]) + Math.random() : Date.now() + Math.random(),
+        date: parts[0],
+        asset: parts[1],
+        maturity: parts[2],
+        side: parts[3],
+        price: parseFloat(parts[4]),
+        qty: parseInt(parts[5]),
+        fxRate: parseFloat(parts[6]),
+        stopLoss: (parts[7] && parts[7] !== "") ? parseFloat(parts[7]) : null,
+        memo: (parts[8] || "").replace(/\\n/g, "\n"),
+        createdAt: parts[9] ? parseInt(parts[9]) : Date.now(),
+        updatedAt: parts[10] ? parseInt(parts[10]) : Date.now()
+      });
+    }
+
+    if (currentSection === "MASTER" && parts.length >= 11) {
+      newMaster[parts[0]] = {
+        symbol: parts[1],
+        ySymbol: parts[2],
+        tick: parseFloat(parts[3]),
+        tickVal: parseFloat(parts[4]),
+        fee: parseFloat(parts[5]),
+        cur: parts[6],
+        marginType: parts[7],
+        initMargin: parseFloat(parts[8]),
+        maintMargin: parseFloat(parts[9]),
+        multiplier: parseFloat(parts[10]),
+        desc: (parts[11] || "").replace(/\\n/g, "\n")
+      };
+    }
+
+    if (currentSection === "ATM" && parts.length >= 3) {
+      newATM.push({
+        id: Date.now() + Math.random(),
+        date: parts[0],
+        acc: parts[1],
+        amt: parseFloat(parts[2]),
+        memo: (parts[3] || "").replace(/\\n/g, "\n")
+      });
+    }
+
+    if (currentSection === "CAPITALS" && parts.length >= 2) {
+      newCapitals.dom = parseFloat(parts[0]) || 0;
+      newCapitals.ovs = parseFloat(parts[1]) || 0;
+    }
+  });
+
+  const hasTrades = newTrades.length > 0;
+  const hasATM = newATM.length > 0;
+  const hasMaster = Object.keys(newMaster).length > 0;
+  const hasCapitals = newCapitals.dom !== 0 || newCapitals.ovs !== 0;
+
+  if (!(hasTrades || hasATM || hasMaster || hasCapitals)) {
+    alert(`${sourceLabel} 데이터에서 유효한 항목을 찾을 수 없습니다.`);
+    return false;
+  }
+
+  const msg = `${sourceLabel} 데이터를 발견했습니다:
+- 매매: ${newTrades.length}건
+- 입출금: ${newATM.length}건
+- 상품설정: ${Object.keys(newMaster).length}건
+
+기존 데이터를 덮어쓰시겠습니까?`;
+  if (!confirm(msg)) return false;
+
+  localStorage.setItem('blotter_backup_before_import', localStorage.getItem('blotter_trades_v96'));
+
+  trades = newTrades;
+  atmRecords = newATM;
+  capitals = newCapitals;
+  if (hasMaster) master = newMaster;
+
+  localStorage.setItem('blotter_trades_v96', JSON.stringify(trades));
+  localStorage.setItem('blotter_atm_v96', JSON.stringify(atmRecords));
+  localStorage.setItem('blotter_master_v96', JSON.stringify(master));
+  localStorage.setItem('blotter_capitals_v96', JSON.stringify(capitals));
+
+  loadCapitals();
+  renderMaster();
+  initAssetSelect();
+  if (typeof renderATM === "function") renderATM();
+  renderAll();
+
+  blotterMeta.lastImportedInputAt = csvLocalInputAt;
+  blotterMeta.lastLocalInputAt = csvLocalInputAt || Date.now();
+  saveMeta();
+  updateSyncHeader();
+
+  alert(`${sourceLabel} 가져오기가 완료되었습니다.`);
+  return true;
 }
 
 function importFromCSV(e) {
@@ -201,139 +354,99 @@ function importFromCSV(e) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = (event) => {
-    let text = event.target.result;
-    text = text.replace(/^\uFEFF/, ""); // BOM(바이트 오더 마크) 제거
-
-    const rows = text.split(/\r?\n/); // 윈도우/맥 줄바꿈 모두 대응
-    const newTrades = [];
-    const newATM = [];
-    const newMaster = {};
-    let newCapitals = { dom: 0, ovs: 0 };
-    let csvLocalInputAt = null;
-    let currentSection = "";
-
-    rows.forEach((row) => {
-      const tr = row.trim();
-      if (!tr) return; // 빈 줄 건너뛰기
-
-      // --- 섹션 헤더 감지 ---
-      if (tr === "---META---")    { currentSection = "META"; return; }
-      if (tr === "---TRADES---")  { currentSection = "TRADES"; return; }
-      if (tr === "---MASTER---")  { currentSection = "MASTER"; return; }
-      if (tr === "---ATM---")     { currentSection = "ATM"; return; }
-      if (tr === "---CAPITALS---") { currentSection = "CAPITALS"; return; }
-
-      // 각 섹션의 테이블 헤더 줄 건너뛰기
-      if (tr.startsWith("Date,Asset,") || tr.startsWith("Asset,Symbol,") || 
-          tr.startsWith("Date,Account,") || tr.startsWith("DOM_KRW,") ||
-          tr === "LAST_LOCAL_INPUT_AT") return;
-
-      // --- 데이터 파싱 ---
-      if (currentSection === "META") {
-        csvLocalInputAt = parseInt(tr, 10) || null;
-        return;
-      }
-
-      const parts = parseCSVLine(tr);
-
-      // 1. 매매 기록 (TRADES)
-      if (currentSection === "TRADES" && parts.length >= 10) {
-        newTrades.push({
-          id: parts[9] ? parseInt(parts[9]) + Math.random() : Date.now() + Math.random(), // ID 중복 방지
-          date: parts[0],
-          asset: parts[1],
-          maturity: parts[2],
-          side: parts[3],
-          price: parseFloat(parts[4]),
-          qty: parseInt(parts[5]),
-          fxRate: parseFloat(parts[6]),
-          stopLoss: (parts[7] && parts[7] !== "") ? parseFloat(parts[7]) : null,
-          memo: (parts[8] || "").replace(/\\n/g, "\n"),
-          createdAt: parts[9] ? parseInt(parts[9]) : Date.now(),
-          updatedAt: parts[10] ? parseInt(parts[10]) : Date.now()
-        });
-      }
-
-      // 2. 상품 마스터 (MASTER)
-      if (currentSection === "MASTER" && parts.length >= 11) {
-        newMaster[parts[0]] = {
-          symbol: parts[1],
-          ySymbol: parts[2],
-          tick: parseFloat(parts[3]),
-          tickVal: parseFloat(parts[4]),
-          fee: parseFloat(parts[5]),
-          cur: parts[6],
-          marginType: parts[7],
-          initMargin: parseFloat(parts[8]),
-          maintMargin: parseFloat(parts[9]),
-          multiplier: parseFloat(parts[10]),
-          desc: (parts[11] || "").replace(/\\n/g, "\n")
-        };
-      }
-
-      // 3. 입출금 기록 (ATM)
-      if (currentSection === "ATM" && parts.length >= 3) {
-        newATM.push({
-          id: Date.now() + Math.random(),
-          date: parts[0],
-          acc: parts[1],
-          amt: parseFloat(parts[2]),
-          memo: (parts[3] || "").replace(/\\n/g, "\n")
-        });
-      }
-
-      // 4. 초기 자본금 (CAPITALS)
-      if (currentSection === "CAPITALS" && parts.length >= 2) {
-        newCapitals.dom = parseFloat(parts[0]) || 0;
-        newCapitals.ovs = parseFloat(parts[1]) || 0;
-      }
-    });
-
-    // 🔴 [핵심 수정] 데이터 존재 여부 통합 체크
-    const hasTrades = newTrades.length > 0;
-    const hasATM = newATM.length > 0;
-    const hasMaster = Object.keys(newMaster).length > 0;
-    const hasCapitals = newCapitals.dom !== 0 || newCapitals.ovs !== 0;
-
-    if (hasTrades || hasATM || hasMaster || hasCapitals) {
-      const msg = `데이터를 발견했습니다:\n- 매매: ${newTrades.length}건\n- 입출금: ${newATM.length}건\n- 상품설정: ${Object.keys(newMaster).length}건\n\n기존 데이터를 덮어쓰시겠습니까?`;
-      
-      if (confirm(msg)) {
-        // 백업 생성 (선택사항)
-        localStorage.setItem('blotter_backup_before_import', localStorage.getItem('blotter_trades_v96'));
-
-        // 실제 데이터 교체
-        trades = newTrades;
-        atmRecords = newATM;
-        capitals = newCapitals;
-        if (hasMaster) master = newMaster;
-
-        // 로컬 스토리지 저장
-        localStorage.setItem('blotter_trades_v96', JSON.stringify(trades));
-        localStorage.setItem('blotter_atm_v96', JSON.stringify(atmRecords));
-        localStorage.setItem('blotter_master_v96', JSON.stringify(master));
-        localStorage.setItem('blotter_capitals_v96', JSON.stringify(capitals));
-
-        // UI 즉시 갱신
-        loadCapitals();
-        renderMaster();
-        initAssetSelect();
-        if (typeof renderATM === "function") renderATM();
-        renderAll();
-
-        // 동기화 상태 업데이트
-        blotterMeta.lastImportedInputAt = csvLocalInputAt;
-        blotterMeta.lastLocalInputAt = csvLocalInputAt || Date.now();
-        saveMeta();
-        updateSyncHeader();
-
-        alert("가져오기가 완료되었습니다.");
-      }
-    } else {
-      alert("CSV 파일에서 유효한 데이터를 찾을 수 없습니다.");
-    }
+    parseAndApplyCSV(String(event.target.result || ""), "CSV 파일");
+    e.target.value = "";
   };
   reader.readAsText(file);
+}
+
+async function syncLogin() {
+  const gistId = prompt("GitHub Gist ID를 입력하세요.", syncAuth.gistId || "");
+  if (!gistId) return;
+
+  const token = prompt("GitHub Personal Access Token(gist 권한)을 입력하세요.", syncAuth.token || "");
+  if (!token) return;
+
+  syncAuth = {
+    provider: "github",
+    gistId: gistId.trim(),
+    token: token.trim()
+  };
+  saveSyncAuth();
+  alert("동기화 로그인 정보가 저장되었습니다.");
+}
+
+function ensureSyncAuth() {
+  if (!syncAuth.gistId || !syncAuth.token) {
+    alert("먼저 로그인 버튼으로 GitHub 동기화 정보를 설정하세요.");
+    return false;
+  }
+  return true;
+}
+
+async function exportToCloud() {
+  if (!ensureSyncAuth()) return;
+
+  const csv = buildCSVSnapshot();
+  const response = await fetch(`https://api.github.com/gists/${syncAuth.gistId}`, {
+    method: "PATCH",
+    headers: {
+      "Authorization": `token ${syncAuth.token}`,
+      "Accept": "application/vnd.github+json",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      description: "alpha-blotter sync",
+      files: {
+        "alpha-blotter-sync.csv": {
+          content: csv
+        }
+      }
+    })
+  });
+
+  if (!response.ok) {
+    alert(`동기화 내보내기 실패: ${response.status}`);
+    return;
+  }
+	
+ blotterMeta.lastExportedInputAt = blotterMeta.lastLocalInputAt;
+  saveMeta();
+  updateSyncHeader();
+  alert("동기화 내보내기가 완료되었습니다.");
+}
+
+async function importFromCloud() {
+  if (!ensureSyncAuth()) return;
+
+  const response = await fetch(`https://api.github.com/gists/${syncAuth.gistId}`, {
+    method: "GET",
+    headers: {
+      "Authorization": `token ${syncAuth.token}`,
+      "Accept": "application/vnd.github+json"
+    }
+  });
+
+  if (!response.ok) {
+    alert(`동기화 가져오기 실패: ${response.status}`);
+    return;
+  }
+
+  const gist = await response.json();
+  const file = gist?.files?.['alpha-blotter-sync.csv'] || Object.values(gist?.files || {}).find(f => f?.filename?.endsWith('.csv'));
+  if (!file || !file.raw_url) {
+    alert("Gist에서 CSV 파일을 찾지 못했습니다.");
+    return;
+  }
+
+  const csvRes = await fetch(file.raw_url);
+  if (!csvRes.ok) {
+    alert(`CSV 다운로드 실패: ${csvRes.status}`);
+    return;
+  }
+
+  const csvText = await csvRes.text();
+  parseAndApplyCSV(csvText, "동기화");
 }
 
 /**
@@ -1585,7 +1698,8 @@ window.onload = () => {
   onAssetChange();
   renderAll();
   syncMarketPrices();
-updateSyncHeader();
+  updateSyncHeader();
+  updateSyncAuthUI();
 };
 
 
