@@ -222,6 +222,29 @@ button {
 .btn-blue { background: var(--accent); color: white; width: 100%; }
 .btn-green { background: #15311e; color: #4ade80; border: 1px solid #244d34; font-size: 10px; }
 .btn-outline { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+
+.btn-sync { font-size: 10px; padding: 6px 8px; }
+
+.sync-auth-status {
+    font-size: 10px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    white-space: nowrap;
+    align-self: center;
+}
+
+.sync-auth-on {
+    color: #4ade80;
+    border-color: #244d34;
+    background: #15311e;
+}
+
+.sync-auth-off {
+    color: #fbbf24;
+    border-color: #5a4720;
+    background: #2f2615;
+}
 .btn-danger { background: #3a1a1a; color: #ff8888; }
 .btn-edit { background: #1e293b; color: var(--warn); border: 1px solid var(--line); margin-right: 4px; }
 
