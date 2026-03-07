@@ -32,15 +32,15 @@ header {
     backdrop-filter: blur(10px);
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: center;
     gap: 16px;
 }
 
 .header-left {
     display: flex;
-    align-items: flex-start;
-    gap: 20px;
-    flex: 1;
+    align-items: center;
+    gap: 16px;
+    flex: 1 1 auto;
     min-width: 0;
 }
 
@@ -54,8 +54,9 @@ header {
     border-radius: 20px;
     border: 1px solid var(--line);
     overflow: hidden;
-    min-width: 0;
-    flex-wrap: wrap;
+    min-width: 280px;
+    max-width: 100%;
+    flex-wrap: nowrap;
 }
 
 #fx-monitor {
@@ -106,8 +107,13 @@ header {
 
 .header-tool-buttons {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 6px;
+}
+.btn-outline,
+.btn-sync,
+.btn-danger {
+    white-space: nowrap;
 }
 
 .header-divider {
@@ -403,11 +409,14 @@ button {
     #sync-bar { width: 100%; justify-content: space-between; margin-left: 0; display: grid; grid-template-columns: 1fr 1fr 1fr; }
 
     .header-actions {
-        width: 100%;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
-    }
+    display: flex;
+    width: auto;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 10px;
+}
 
     .header-tool-single {
         padding-top: 0;
