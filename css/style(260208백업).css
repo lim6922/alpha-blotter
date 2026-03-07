@@ -1,0 +1,357 @@
+/* =========================================================================
+   [1] GLOBAL VARIABLES & RESET
+   ========================================================================= */
+:root {
+    --bg: #0b0d12;
+    --card: #141824;
+    --text: #e7eaf2;
+    --muted: #a7b0c5;
+    --line: #2a3145;
+    --bad: #ff5c5c;
+    --good: #4ade80;
+    --warn: #fbbf24;
+    --accent: #5673ff;
+}
+
+body {
+    margin: 0;
+    font-family: 'Inter', 'Pretendard', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 12px;
+    overflow: hidden; /* 대시보드 내부 스크롤 처리를 위해 본체 스크롤 고정 */
+}
+
+/* =========================================================================
+   [2] HEADER & NAVIGATION
+   ========================================================================= */
+header {
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(11, 13, 18, 0.9);
+    backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex: 1;
+}
+
+/* 실시간 시세 및 동기화 정보 컨테이너 */
+#fx-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--line);
+    overflow: hidden;
+}
+
+#fx-monitor {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+
+.price-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.sync-info {
+    font-size: 10px;
+    color: var(--muted);
+    border-left: 1px solid var(--line);
+    padding-left: 10px;
+    margin-left: 5px;
+    white-space: nowrap;
+}
+
+/* 메인 탭 메뉴 */
+.nav-tabs {
+    display: flex;
+    background: #0b0d12;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--line);
+    gap: 5px;
+}
+
+.tab-link {
+    padding: 10px 20px;
+    cursor: pointer;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    transition: 0.2s;
+    font-weight: 600;
+}
+
+.tab-link:hover { color: var(--text); }
+.tab-link.active {
+    color: var(--accent);
+    border-bottom: 2px solid var(--accent);
+    background: rgba(86, 115, 255, 0.05);
+}
+
+.tab-content {
+    display: none;
+    height: calc(100vh - 105px);
+    overflow: hidden;
+}
+
+.tab-content.active { display: block; }
+
+/* =========================================================================
+   [3] MAIN LAYOUT & GRID
+   ========================================================================= */
+.main-grid {
+    display: grid;
+    grid-template-columns: 380px 1fr 360px; /* 좌측 입력 / 중앙 현황 / 우측 리스크 */
+    gap: 12px;
+    padding: 12px;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.scroll-col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+/* 스크롤바 커스텀 */
+.scroll-col::-webkit-scrollbar { width: 4px; }
+.scroll-col::-webkit-scrollbar-thumb { background: var(--line); border-radius: 10px; }
+
+/* =========================================================================
+   [4] COMPONENTS (CARDS, TABLES, STATS)
+   ========================================================================= */
+.card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 15px;
+}
+
+.card h2 {
+    font-size: 13px;
+    margin: 0 0 12px;
+    color: var(--accent);
+    border-left: 3px solid var(--accent);
+    padding-left: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* 하이라이트 카드 (리스크 모니터 등 강조용) */
+.highlight-card {
+    border: 1px solid var(--accent);
+    background: linear-gradient(145deg, #1a1f2e, #141824);
+}
+
+/* 데이터 테이블 */
+.table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #0b0d12;
+}
+
+table { width: 100%; border-collapse: collapse; font-size: 11px; }
+th { background: #1a1f2e; padding: 8px; color: var(--muted); text-align: left; position: sticky; top: 0; z-index: 10; }
+td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+
+/* 수치 요약 영역 */
+.stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }
+.stat-card { background: #1a1f2e; padding: 12px; border-radius: 8px; border: 1px solid var(--line); text-align: center; }
+.stat-label { font-size: 10px; color: var(--muted); margin-bottom: 5px; }
+.stat-val { font-size: 16px; font-weight: bold; font-family: 'JetBrains Mono', monospace; }
+.big-val { font-size: 18px; font-weight: 800; letter-spacing: 0.2px; }
+
+/* =========================================================================
+   [5] FORMS & INPUTS
+   ========================================================================= */
+input, select, textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    background: #0f1320;
+    color: var(--text);
+    font-size: 11px;
+}
+
+.td-input-mtm { width: 80px; color: var(--warn); height: 24px; }
+
+/* 대시보드 날짜/DTE 입력 그리드 */
+.date-sync-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    grid-column: span 2;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    margin-top: 4px;
+}
+
+button {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 11px;
+    transition: 0.2s;
+}
+
+.btn-blue { background: var(--accent); color: white; width: 100%; }
+.btn-green { background: #15311e; color: #4ade80; border: 1px solid #244d34; font-size: 10px; }
+.btn-outline { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+.btn-danger { background: #3a1a1a; color: #ff8888; }
+.btn-edit { background: #1e293b; color: var(--warn); border: 1px solid var(--line); margin-right: 4px; }
+
+.btn-group-half { display: flex; gap: 8px; margin-top: 15px; }
+.btn-group-half button { flex: 1; }
+.btn-main-wide { flex: 2 !important; }
+
+/* =========================================================================
+   [6] PRODUCT MASTER MANAGEMENT (상품 마스터 관리)
+   ========================================================================= */
+.master-label {
+    font-size: 9px;
+    color: var(--muted);
+    margin-bottom: 2px;
+}
+
+/* 마스터 입력 3열 그리드 - 중요: 이 부분이 무너짐의 원인 */
+.master-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.master-item {
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 8px;
+    transition: 0.2s;
+}
+
+.master-item:hover { background: rgba(255,255,255,0.02); }
+
+/* =========================================================================
+   [7] PERFORMANCE REPORT (성과 리포트)
+   ========================================================================= */
+.report-wrapper {
+    padding: 20px;
+    height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+/* 리포트 필터 바 */
+.report-filter {
+    display: flex;
+    align-items: flex-end;
+    gap: 15px;
+    background: var(--card);
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    margin-bottom: 20px;
+}
+
+.filter-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.filter-item label {
+    font-size: 10px;
+    color: var(--muted);
+}
+
+.filter-item input {
+    width: 150px;
+}
+
+/* 리포트 요약 5열 그리드 */
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+/* =========================================================================
+   [8] UTILITIES & STATES
+   ========================================================================= */
+.mono { font-family: 'JetBrains Mono', monospace; }
+.up { color: var(--good); }
+.down { color: var(--bad); }
+.hidden { display: none !important; }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; border: 1px solid var(--line); color: var(--muted); }
+
+/* 편집 모드 하이라이트 */
+.edit-active { border: 2px solid var(--warn) !important; background: rgba(251, 191, 36, 0.05) !important; }
+.edit-active-row { background: rgba(251, 191, 36, 0.2) !important; border-left: 4px solid var(--warn) !important; }
+
+/* 싱크 상태 컬러링 */
+.sync-ok { color: var(--good); }
+.sync-warn { color: var(--warn); font-weight: 700; }
+.sync-danger { color: var(--bad); font-weight: 800; animation: pulse 2s infinite; }
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* =========================================================================
+   [9] RESPONSIVE (MOBILE)
+   ========================================================================= */
+@media (max-width: 768px) {
+    html, body { overflow-x: hidden; overflow-y: auto; }
+
+    header { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; }
+    .header-left { flex-direction: column; width: 100%; }
+    
+    #fx-container { width: 100%; flex-wrap: wrap; border-radius: 8px; }
+    #sync-bar { width: 100%; justify-content: space-between; margin-left: 0; display: grid; grid-template-columns: 1fr 1fr 1fr; }
+
+    header > div:last-child { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; }
+
+    /* 대시보드 그리드 해제 */
+    .main-grid { display: block; height: auto; }
+    .scroll-col { width: 100%; overflow: visible; margin-bottom: 16px; }
+    .tab-content { height: auto !important; overflow: visible !important; }
+
+    /* 테이블 가로 스크롤 허용 */
+    .table-wrap { overflow-x: auto; }
+    table { min-width: 850px; }
+    
+    /* 리포트 레이아웃 조정 */
+    .report-filter { flex-direction: column; align-items: stretch; }
+    .filter-item input { width: 100%; }
+    .summary-grid { grid-template-columns: repeat(2, 1fr); }
+    .master-grid { grid-template-columns: 1fr 1fr; }
+}
+
+//* 20260208_2121수정 *//
