@@ -147,23 +147,26 @@ function getTimestamp() {
     + String(now.getMinutes()).padStart(2, '0');
 }
 
-const SYNC_AUTH_STORAGE_KEY = "blotter_sync_auth_v96";
-let syncAuth = JSON.parse(localStorage.getItem(SYNC_AUTH_STORAGE_KEY)) || {
-  provider: "github",
-  gistId: "",
-  token: ""
-};
 
-function saveSyncAuth() {
-  localStorage.setItem(SYNC_AUTH_STORAGE_KEY, JSON.stringify(syncAuth));
-  updateSyncAuthUI();
-}
 
-function updateSyncAuthUI() {
+async function updateSyncAuthUI() {
   const el = document.getElementById('sync-auth-status');
   if (!el) return;
-  if (syncAuth.gistId && syncAuth.token) {
-    el.innerText = `로그인됨 · Gist ${syncAuth.gistId.slice(0, 6)}...`;
+
+  const { data, error } = await supabaseClient.auth.getUser();
+
+  if (error) {
+    el.innerText = '로그인 확인 실패';
+    el.classList.remove('sync-auth-on');
+    el.classList.add('sync-auth-off');
+    return;
+  }
+
+  const user = data?.user;
+
+  if (user) {
+    const email = user.email || 'Google User';
+    el.innerText = `로그인됨 · ${email}`;
     el.classList.remove('sync-auth-off');
     el.classList.add('sync-auth-on');
   } else {
@@ -361,19 +364,31 @@ function importFromCSV(e) {
 }
 
 async function syncLogin() {
-  const gistId = prompt("GitHub Gist ID를 입력하세요.", syncAuth.gistId || "");
-  if (!gistId) return;
+  const { data: sessionData, error: sessionError } = await supabaseClient.auth.getSession();
 
-  const token = prompt("GitHub Personal Access Token(gist 권한)을 입력하세요.", syncAuth.token || "");
-  if (!token) return;
+  if (sessionError) {
+    alert("세션 확인 실패: " + sessionError.message);
+    return;
+  }
 
-  syncAuth = {
-    provider: "github",
-    gistId: gistId.trim(),
-    token: token.trim()
-  };
-  saveSyncAuth();
-  alert("동기화 로그인 정보가 저장되었습니다.");
+  if (sessionData?.session) {
+    alert("이미 로그인되어 있습니다.");
+    await updateSyncAuthUI();
+    return;
+  }
+
+  const redirectTo = window.location.origin + window.location.pathname;
+
+  const { error } = await supabaseClient.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo
+    }
+  });
+
+  if (error) {
+    alert("Google 로그인 실패: " + error.message);
+  }
 }
 
 function ensureSyncAuth() {
@@ -1681,7 +1696,7 @@ function updateAvailContractsOnPrice(){ // on price input
  * Boot
  * =========================
  */
-window.onload = () => {
+window.onload = async () => {
   initAssetSelect();
   renderMaster();
   loadCapitals();
@@ -1692,14 +1707,12 @@ window.onload = () => {
   }
   syncDTEFromMaturity();
 
-
-
-  renderATM(); // 추가
+  renderATM();
   onAssetChange();
   renderAll();
   syncMarketPrices();
   updateSyncHeader();
-  updateSyncAuthUI();
+  await updateSyncAuthUI();
 };
 
 
