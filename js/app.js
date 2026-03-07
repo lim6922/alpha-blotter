@@ -150,15 +150,19 @@ function getTimestamp() {
 
 
 async function updateSyncAuthUI() {
-  const el = document.getElementById('sync-auth-status');
-  if (!el) return;
+  const statusEl = document.getElementById('sync-auth-status');
+  const btnEl = document.getElementById('syncAuthBtn');
+
+  if (!statusEl) return;
 
   const { data, error } = await supabaseClient.auth.getUser();
 
   if (error) {
-    el.innerText = '로그인 확인 실패';
-    el.classList.remove('sync-auth-on');
-    el.classList.add('sync-auth-off');
+    statusEl.innerText = '로그인 확인 실패';
+    statusEl.classList.remove('sync-auth-on');
+    statusEl.classList.add('sync-auth-off');
+
+    if (btnEl) btnEl.innerText = '동기화 로그인';
     return;
   }
 
@@ -166,13 +170,17 @@ async function updateSyncAuthUI() {
 
   if (user) {
     const email = user.email || 'Google User';
-    el.innerText = `로그인됨 · ${email}`;
-    el.classList.remove('sync-auth-off');
-    el.classList.add('sync-auth-on');
+    statusEl.innerText = `로그인됨 · ${email}`;
+    statusEl.classList.remove('sync-auth-off');
+    statusEl.classList.add('sync-auth-on');
+
+    if (btnEl) btnEl.innerText = '로그아웃';
   } else {
-    el.innerText = '로그인 필요';
-    el.classList.remove('sync-auth-on');
-    el.classList.add('sync-auth-off');
+    statusEl.innerText = '로그인 필요';
+    statusEl.classList.remove('sync-auth-on');
+    statusEl.classList.add('sync-auth-off');
+
+    if (btnEl) btnEl.innerText = '동기화 로그인';
   }
 }
 
@@ -428,6 +436,46 @@ async function syncLogout() {
 
   await updateSyncAuthUI();
   alert("로그아웃 되었습니다.");
+}
+
+async function handleSyncAuth() {
+  const { data, error } = await supabaseClient.auth.getUser();
+
+  if (error) {
+    alert("로그인 상태 확인 실패: " + error.message);
+    return;
+  }
+
+  const user = data?.user;
+
+  if (user) {
+    const confirmed = confirm("로그아웃 하시겠습니까?");
+    if (!confirmed) return;
+
+    const { error: signOutError } = await supabaseClient.auth.signOut();
+    if (signOutError) {
+      alert("로그아웃 실패: " + signOutError.message);
+      return;
+    }
+
+    await updateSyncAuthUI();
+    alert("로그아웃 되었습니다.");
+    return;
+  }
+
+  // 로그인 안 된 상태 -> Google 로그인 시작
+  const redirectTo = window.location.origin + window.location.pathname;
+
+  const { error: signInError } = await supabaseClient.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo
+    }
+  });
+
+  if (signInError) {
+    alert("Google 로그인 실패: " + signInError.message);
+  }
 }
 
 function toSafeIntegerId(value) {
