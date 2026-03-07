@@ -498,9 +498,14 @@ async function exportToCloud() {
   const user = await getCurrentUserOrAlert();
   if (!user) return;
 
-  const confirmed = confirm(
-    "현재 데이터를 원격 동기화 데이터로 저장합니다.\n기존 원격 데이터는 덮어써질 수 있습니다.\n계속하시겠습니까?"
-  );
+  const exportSummaryMsg = `현재 데이터를 원격 동기화 데이터로 저장합니다:
+- 매매: ${trades.length}건
+- 입출금: ${atmRecords.length}건
+- 상품설정: ${Object.keys(master).length}건
+
+기존 원격 데이터는 덮어써질 수 있습니다.
+계속하시겠습니까?`;
+  const confirmed = confirm(exportSummaryMsg);
   if (!confirmed) return;
 
   try {
