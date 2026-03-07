@@ -36,20 +36,36 @@
   </div>
 
   <!-- 글로벌 액션 버튼 모음 -->
-  <div style="display:flex; gap:10px;">
-    <button class="btn-outline" id="stealthBtn" onclick="toggleStealthMode()">👁️ 차트 숨기기</button>
-    <div style="height:20px; width:1px; background:var(--line); margin:0 5px;"></div>
- <button class="btn-outline btn-sync" onclick="syncLogin()">동기화 로그인</button>
-    <button class="btn-outline btn-sync" onclick="importFromCloud()">동기화 가져오기</button>
-    <button class="btn-outline btn-sync" onclick="exportToCloud()">동기화 내보내기</button>
-    <button class="btn-outline btn-sync" onclick="syncLogout()">로그아웃</button>
-    <span id="sync-auth-status" class="sync-auth-status sync-auth-off">로그인 필요</span>
-    <div style="height:20px; width:1px; background:var(--line); margin:0 5px;"></div>    
-    <input type="file" id="csvImport" style="display:none;" onchange="importFromCSV(event)" />
-    <button class="btn-outline" onclick="document.getElementById('csvImport').click()">CSV 가져오기</button>
-    <button class="btn-outline" onclick="exportToCSV()">CSV 내보내기</button>
-    <button class="btn-danger" onclick="clearAllData()">전체삭제</button>
+<div style="display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap;">
+  <!-- 차트 관련 -->
+  <button class="btn-outline" id="stealthBtn" onclick="toggleStealthMode()">👁️ 차트 숨기기</button>
+  <div style="height:20px; width:1px; background:var(--line); margin:0 5px;"></div>
+
+  <!-- 동기화 영역 -->
+  <div style="display:flex; flex-direction:column; gap:6px; min-width:260px;">
+    <div style="font-size:10px; color:var(--muted);">동기화</div>
+        <span id="sync-auth-status" class="sync-auth-status sync-auth-off">로그인 필요</span>
+    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+      <button class="btn-outline btn-sync" id="syncAuthBtn" onclick="handleSyncAuth()">동기화 로그인</button>
+      <button class="btn-outline btn-sync" onclick="importFromCloud()">동기화 가져오기</button>
+      <button class="btn-outline btn-sync" onclick="exportToCloud()">동기화 내보내기</button>
+    </div>
   </div>
+
+  <div style="height:20px; width:1px; background:var(--line); margin:0 5px;"></div>
+
+  <!-- CSV 영역 -->
+  <div style="display:flex; flex-direction:column; gap:6px; min-width:220px;">
+    <div style="font-size:10px; color:var(--muted);">로컬 CSV</div>
+    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+      <input type="file" id="csvImport" style="display:none;" onchange="importFromCSV(event)" />
+      <button class="btn-outline" onclick="document.getElementById('csvImport').click()">CSV 가져오기</button>
+      <button class="btn-outline" onclick="exportToCSV()">CSV 내보내기</button>
+      <button class="btn-danger" onclick="clearAllData()">전체삭제</button>
+    </div>
+  </div>
+</div>
+  
 </header>
 <!-- // [END OF HEADER] -->
 
