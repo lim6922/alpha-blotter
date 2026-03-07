@@ -439,6 +439,8 @@ function toSafeIntegerId(value) {
 }
 
 async function exportToCloud() {
+  console.log("NEW exportToCloud running");
+  alert("exportToCloud 진입 확인");
   const user = await getCurrentUserOrAlert();
   if (!user) return;
 
