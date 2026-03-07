@@ -13,7 +13,15 @@ function saveMeta() {
 
 function fmtTime(ts) {
   if (!ts) return "-";
-  return new Date(ts).toLocaleString();
+  const d = new Date(Number(ts));
+  if (Number.isNaN(d.getTime())) return "-";
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${yyyy}.${mm}.${dd} ${hh}:${mi}:${ss}`;
 }
 
 /**
@@ -743,9 +751,11 @@ async function importFromCloud() {
       ovs: Number(capitalRow?.ovs || 0)
     };
 
-    blotterMeta.lastImportedInputAt = metaRow?.last_local_input_at || Date.now();
-    blotterMeta.lastLocalInputAt = metaRow?.last_local_input_at || Date.now();
-    blotterMeta.lastExportedInputAt = metaRow?.last_exported_input_at || null;
+    const syncedLocalInputAt = Number(metaRow?.last_local_input_at) || Date.now();
+    // IMPORT/EXPORT 시각은 원본 데이터가 가진 "로컬 입력 기준 시각"을 사용
+    blotterMeta.lastImportedInputAt = syncedLocalInputAt;
+    blotterMeta.lastLocalInputAt = syncedLocalInputAt;
+    blotterMeta.lastExportedInputAt = Number(metaRow?.last_exported_input_at) || null;
 
     // 10) localStorage 캐시도 갱신
     localStorage.setItem('blotter_trades_v96', JSON.stringify(trades));
