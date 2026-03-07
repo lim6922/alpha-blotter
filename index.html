@@ -36,28 +36,28 @@
   </div>
 
   <!-- 글로벌 액션 버튼 모음 -->
-<div style="display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap;">
-  <!-- 차트 관련 -->
-  <button class="btn-outline" id="stealthBtn" onclick="toggleStealthMode()">👁️ 차트 숨기기</button>
-  <div style="height:20px; width:1px; background:var(--line); margin:0 5px;"></div>
+<div class="header-actions">
+  <div class="header-tool-single">
+    <button class="btn-outline" id="stealthBtn" onclick="toggleStealthMode()">👁️ 차트 숨기기</button>
+  </div>
 
-  <!-- 동기화 영역 -->
-  <div style="display:flex; flex-direction:column; gap:6px; min-width:260px;">
-    <div style="font-size:10px; color:var(--muted);">동기화</div>
-    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+  <div class="header-divider"></div>
+
+  <div class="header-tool-group">
+    <div class="header-tool-title">동기화</div>
+    <div class="header-tool-buttons">
       <button class="btn-outline btn-sync" id="syncAuthBtn" onclick="handleSyncAuth()">동기화 로그인</button>
       <button class="btn-outline btn-sync" onclick="importFromCloud()">동기화 가져오기</button>
       <button class="btn-outline btn-sync" onclick="exportToCloud()">동기화 내보내기</button>
     </div>
-       <span id="sync-auth-status" class="sync-auth-status sync-auth-off">로그인 필요</span>
+    <span id="sync-auth-status" class="sync-auth-status sync-auth-off">로그인 필요</span>
   </div>
 
-  <div style="height:20px; width:1px; background:var(--line); margin:0 5px;"></div>
+  <div class="header-divider"></div>
 
-  <!-- CSV 영역 -->
-  <div style="display:flex; flex-direction:column; gap:6px; min-width:220px;">
-    <div style="font-size:10px; color:var(--muted);">로컬 CSV</div>
-    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+  <div class="header-tool-group">
+    <div class="header-tool-title">로컬 CSV</div>
+    <div class="header-tool-buttons">
       <input type="file" id="csvImport" style="display:none;" onchange="importFromCSV(event)" />
       <button class="btn-outline" onclick="document.getElementById('csvImport').click()">CSV 가져오기</button>
       <button class="btn-outline" onclick="exportToCSV()">CSV 내보내기</button>
