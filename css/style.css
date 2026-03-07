@@ -210,6 +210,8 @@ header {
     gap: 12px;
     overflow-y: auto;
     padding-right: 5px;
+    padding-bottom: 20px;
+    box-sizing: border-box;
 }
 
 /* 스크롤바 커스텀 */
