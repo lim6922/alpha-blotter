@@ -44,12 +44,12 @@
   <!-- 동기화 영역 -->
   <div style="display:flex; flex-direction:column; gap:6px; min-width:260px;">
     <div style="font-size:10px; color:var(--muted);">동기화</div>
-        <span id="sync-auth-status" class="sync-auth-status sync-auth-off">로그인 필요</span>
     <div style="display:flex; gap:6px; flex-wrap:wrap;">
       <button class="btn-outline btn-sync" id="syncAuthBtn" onclick="handleSyncAuth()">동기화 로그인</button>
       <button class="btn-outline btn-sync" onclick="importFromCloud()">동기화 가져오기</button>
       <button class="btn-outline btn-sync" onclick="exportToCloud()">동기화 내보내기</button>
     </div>
+       <span id="sync-auth-status" class="sync-auth-status sync-auth-off">로그인 필요</span>
   </div>
 
   <div style="height:20px; width:1px; background:var(--line); margin:0 5px;"></div>
