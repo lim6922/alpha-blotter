@@ -200,7 +200,17 @@ async function getCurrentUserOrAlert() {
     return null;
   }
 
-    return data.session.user;
+  const user = data.session.user;
+  const allowed = await isAllowedEmail(user.email);
+
+  if (!allowed) {
+    await supabaseClient.auth.signOut();
+    await updateSyncAuthUI();
+    alert("허용되지 않은 계정입니다. 관리자의 허용이 필요합니다.");
+    return null;
+  }
+
+  return user;
 }
 
 function toISOStringSafeFromMillis(ms) {
@@ -215,6 +225,28 @@ function toISOStringSafeFromMillis(ms) {
 }
 
 
+
+
+
+async function isAllowedEmail(email) {
+  if (!email) return false;
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  if (!normalizedEmail) return false;
+
+  const { data, error } = await supabaseClient
+    .from('allowed_emails')
+    .select('email')
+    .eq('email', normalizedEmail)
+    .limit(1);
+
+  if (error) {
+    console.error('허용 이메일 확인 실패:', error.message);
+    return false;
+  }
+
+  return Array.isArray(data) && data.length > 0;
+}
 
 function buildCSVSnapshot() {
   let csv = "---META---\nLAST_LOCAL_INPUT_AT\n";
@@ -457,6 +489,14 @@ async function handleSyncAuth() {
   const user = data?.session?.user;
 
   if (user) {
+    const allowed = await isAllowedEmail(user.email);
+    if (!allowed) {
+      await supabaseClient.auth.signOut();
+      await updateSyncAuthUI();
+      alert("허용되지 않은 계정입니다. 관리자의 허용이 필요합니다.");
+      return;
+    }
+
     const confirmed = confirm("로그아웃 하시겠습니까?");
     if (!confirmed) return;
 
@@ -2041,7 +2081,15 @@ window.onload = async () => {
   if (error) {
     console.error("Supabase session restore failed:", error.message);
   } else if (data?.session) {
-    console.log("Supabase session restored:", data.session.user?.email || data.session.user?.id);
+    const allowed = await isAllowedEmail(data.session.user?.email);
+
+    if (!allowed) {
+      await supabaseClient.auth.signOut();
+      await updateSyncAuthUI();
+      alert("허용되지 않은 계정입니다. 관리자의 허용이 필요합니다.");
+    } else {
+      console.log("Supabase session restored:", data.session.user?.email || data.session.user?.id);
+    }
   }
 };
 
