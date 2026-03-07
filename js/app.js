@@ -284,7 +284,7 @@ function parseAndApplyCSV(text, sourceLabel = "CSV") {
 
     if (currentSection === "TRADES" && parts.length >= 10) {
       newTrades.push({
-        id: parts[9] ? parseInt(parts[9]) + Math.random() : Date.now() + Math.random(),
+        id: parts[9] ? parseInt(parts[9], 10) : Date.now(),
         date: parts[0],
         asset: parts[1],
         maturity: parts[2],
@@ -317,7 +317,7 @@ function parseAndApplyCSV(text, sourceLabel = "CSV") {
 
     if (currentSection === "ATM" && parts.length >= 3) {
       newATM.push({
-        id: Date.now() + Math.random(),
+        id: Date.now(),
         date: parts[0],
         acc: parts[1],
         amt: parseFloat(parts[2]),
@@ -415,10 +415,35 @@ async function syncLogin() {
   }
 }
 
+async function syncLogout() {
+  const confirmed = confirm("로그아웃 하시겠습니까?");
+  if (!confirmed) return;
+
+  const { error } = await supabaseClient.auth.signOut();
+
+  if (error) {
+    alert("로그아웃 실패: " + error.message);
+    return;
+  }
+
+  await updateSyncAuthUI();
+  alert("로그아웃 되었습니다.");
+}
+
+function toSafeIntegerId(value) {
+  const n = Number(value);
+  if (Number.isFinite(n)) {
+    return Math.trunc(n);
+  }
+  return Date.now();
+}
 
 async function exportToCloud() {
   const user = await getCurrentUserOrAlert();
   if (!user) return;
+
+  const confirmed = confirm("현재 데이터를 Supabase에 덮어써서 내보내시겠습니까?");
+  if (!confirmed) return;
 
   try {
     // 1) trades: 기존 사용자 데이터 삭제
@@ -433,7 +458,7 @@ async function exportToCloud() {
     if (trades.length > 0) {
       const tradeRows = trades.map(t => ({
         user_id: user.id,
-        trade_id: t.id,
+        trade_id: toSafeIntegerId(t.id),
         date: t.date,
         asset: t.asset,
         maturity: t.maturity || null,
@@ -466,7 +491,7 @@ async function exportToCloud() {
     if (atmRecords.length > 0) {
       const atmRows = atmRecords.map(r => ({
         user_id: user.id,
-        record_id: r.id,
+        record_id: toSafeIntegerId(r.id),
         acc: r.acc,
         date: r.date,
         amt: r.amt,
