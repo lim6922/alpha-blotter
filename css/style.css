@@ -85,9 +85,11 @@ header {
    [HEADER ACTIONS LAYOUT]
    ========================================================================= */
 .header-actions {
+    display: flex;
     width: 100%;
-    flex-direction: column;
-    align-items: stretch;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
 }
 
@@ -96,18 +98,22 @@ header {
 }
 
 .header-tool-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
     min-width: 0;
-    width: 100%;
 }
 
 .header-tool-buttons {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-wrap: wrap;
     gap: 6px;
 }
 
 .header-divider {
-    display: none;
+    width: 1px;
+    height: 38px;
+    background: var(--line);
 }
 
 
@@ -397,30 +403,30 @@ button {
     #sync-bar { width: 100%; justify-content: space-between; margin-left: 0; display: grid; grid-template-columns: 1fr 1fr 1fr; }
 
     .header-actions {
-    width: 100%;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-}
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
 
-.header-tool-single {
-    padding-top: 0;
-}
+    .header-tool-single {
+        padding-top: 0;
+    }
 
-.header-tool-group {
-    min-width: 0;
-    width: 100%;
-}
+    .header-tool-group {
+        min-width: 0;
+        width: 100%;
+    }
 
-.header-tool-buttons {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-}
+    .header-tool-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+    }
 
-.header-divider {
-    display: none;
-}
+    .header-divider {
+        display: none;
+    }
 
     /* 대시보드 그리드 해제 */
     .main-grid { display: block; height: auto; }
