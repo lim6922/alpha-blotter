@@ -176,6 +176,30 @@ async function updateSyncAuthUI() {
   }
 }
 
+async function getCurrentUserOrAlert() {
+  const { data, error } = await supabaseClient.auth.getUser();
+
+  if (error || !data?.user) {
+    alert("먼저 동기화 로그인(Google 로그인)을 해주세요.");
+    return null;
+  }
+
+  return data.user;
+}
+
+function toISOStringSafeFromMillis(ms) {
+  if (!ms) return new Date().toISOString();
+
+  const d = new Date(ms);
+  if (isNaN(d.getTime())) {
+    return new Date().toISOString();
+  }
+
+  return d.toISOString();
+}
+
+
+
 function buildCSVSnapshot() {
   let csv = "---META---\nLAST_LOCAL_INPUT_AT\n";
   csv += `${blotterMeta.lastLocalInputAt || ""}\n\n`;
