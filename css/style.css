@@ -32,14 +32,16 @@ header {
     backdrop-filter: blur(10px);
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
+    gap: 16px;
 }
 
 .header-left {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 20px;
     flex: 1;
+    min-width: 0;
 }
 
 /* 실시간 시세 및 동기화 정보 컨테이너 */
@@ -52,6 +54,8 @@ header {
     border-radius: 20px;
     border: 1px solid var(--line);
     overflow: hidden;
+    min-width: 0;
+    flex-wrap: wrap;
 }
 
 #fx-monitor {
@@ -76,6 +80,36 @@ header {
     margin-left: 5px;
     white-space: nowrap;
 }
+
+/* =========================================================================
+   [HEADER ACTIONS LAYOUT]
+   ========================================================================= */
+.header-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+}
+
+.header-tool-single {
+    padding-top: 0;
+}
+
+.header-tool-group {
+    min-width: 0;
+    width: 100%;
+}
+
+.header-tool-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.header-divider {
+    display: none;
+}
+
 
 /* 메인 탭 메뉴 */
 .nav-tabs {
@@ -231,7 +265,10 @@ button {
     border-radius: 999px;
     border: 1px solid var(--line);
     white-space: nowrap;
-    align-self: center;
+    align-self: flex-start;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .sync-auth-on {
@@ -359,7 +396,31 @@ button {
     #fx-container { width: 100%; flex-wrap: wrap; border-radius: 8px; }
     #sync-bar { width: 100%; justify-content: space-between; margin-left: 0; display: grid; grid-template-columns: 1fr 1fr 1fr; }
 
-    header > div:last-child { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; }
+    .header-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+}
+
+.header-tool-single {
+    padding-top: 0;
+}
+
+.header-tool-group {
+    min-width: 0;
+    width: 100%;
+}
+
+.header-tool-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.header-divider {
+    display: none;
+}
 
     /* 대시보드 그리드 해제 */
     .main-grid { display: block; height: auto; }
@@ -376,5 +437,3 @@ button {
     .summary-grid { grid-template-columns: repeat(2, 1fr); }
     .master-grid { grid-template-columns: 1fr 1fr; }
 }
-
-//* 20260208_2121수정 *//
