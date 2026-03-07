@@ -155,7 +155,7 @@ async function updateSyncAuthUI() {
 
   if (!statusEl) return;
 
-  const { data, error } = await supabaseClient.auth.getUser();
+  const { data, error } = await supabaseClient.auth.getSession();
 
   if (error) {
     statusEl.innerText = '로그인 확인 실패';
@@ -166,7 +166,7 @@ async function updateSyncAuthUI() {
     return;
   }
 
-  const user = data?.user;
+  const user = data?.session?.user;
 
   if (user) {
     const email = user.email || 'Google User';
@@ -185,14 +185,14 @@ async function updateSyncAuthUI() {
 }
 
 async function getCurrentUserOrAlert() {
-  const { data, error } = await supabaseClient.auth.getUser();
+  const { data, error } = await supabaseClient.auth.getSession();
 
-  if (error || !data?.user) {
+  if (error || !data?.session?.user) {
     alert("먼저 동기화 로그인(Google 로그인)을 해주세요.");
     return null;
   }
 
-  return data.user;
+    return data.session.user;
 }
 
 function toISOStringSafeFromMillis(ms) {
@@ -439,14 +439,14 @@ async function syncLogout() {
 }
 
 async function handleSyncAuth() {
-  const { data, error } = await supabaseClient.auth.getUser();
+  const { data, error } = await supabaseClient.auth.getSession();
 
   if (error) {
     alert("로그인 상태 확인 실패: " + error.message);
     return;
   }
 
-  const user = data?.user;
+  const user = data?.session?.user;
 
   if (user) {
     const confirmed = confirm("로그아웃 하시겠습니까?");
