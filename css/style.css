@@ -49,10 +49,10 @@ header {
     display: flex;
     align-items: center;
     flex: 1 1 720px;
-    gap: 12px;
+    gap: 10px;
     background: rgba(255, 255, 255, 0.03);
-    padding: 8px 12px;
-    border-radius: 20px;
+    padding: 4px 10px;
+    border-radius: 14px;
     border: 1px solid var(--line);
     overflow: visible;
     min-width: 500px;
@@ -64,29 +64,32 @@ header {
     margin-left: 0 !important;
     flex-shrink: 0;
     display: grid !important;
-    grid-template-columns: repeat(3, minmax(96px, auto));
-    gap: 16px !important;
-    align-items: start;
+    grid-template-columns: repeat(3, minmax(88px, auto));
+    gap: 12px !important;
+    align-items: center;
+    font-size: 10px !important;
 }
 
 #sync-bar > div {
     min-width: 0;
-    line-height: 1.35;
+    line-height: 1.2;
 }
 
 #sync-bar b {
     display: block;
-    margin-bottom: 2px;
+    margin-bottom: 1px;
+    font-size: 10px;
 }
 
 #sync-bar span {
     display: block;
     white-space: nowrap;
+    font-size: 10px;
 }
 
 #fx-monitor {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     align-items: center;
     flex-wrap: nowrap;
     min-width: 0;
@@ -94,7 +97,7 @@ header {
 
 .price-tag {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     white-space: nowrap;
 }
@@ -103,8 +106,8 @@ header {
     font-size: 10px;
     color: var(--muted);
     border-left: 1px solid var(--line);
-    padding-left: 10px;
-    margin-left: 5px;
+    padding-left: 8px;
+    margin-left: 2px;
     white-space: nowrap;
 }
 
