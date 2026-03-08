@@ -126,7 +126,7 @@ header {
 .header-actions-row {
     display: flex;
     gap: 6px;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     justify-content: flex-end;
     align-items: center;
 }
@@ -451,17 +451,26 @@ button {
     header { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; }
     .header-left { flex-direction: column; width: 100%; }
     
-    #fx-container { width: 100%; flex-wrap: wrap; border-radius: 8px; }
+    #fx-container { width: 100%; flex-wrap: wrap; border-radius: 8px; min-width: 0; }
     #sync-bar { width: 100%; justify-content: space-between; margin-left: 0; display: grid; grid-template-columns: 1fr 1fr 1fr; }
 
     .header-actions {
         width: 100%;
         align-items: stretch;
         gap: 6px;
+       min-width: 0;
     }
 
     .header-actions-row {
         justify-content: flex-start;
+        width: 100%;
+        gap: 6px;
+    }
+
+    .header-actions-row button,
+    .header-actions-row .sync-auth-status {
+        flex: 1 1 calc(50% - 6px);
+        min-width: 140px;
     }
 
     .header-tool-single {
@@ -497,4 +506,30 @@ button {
     .filter-item input { width: 100%; }
     .summary-grid { grid-template-columns: repeat(2, 1fr); }
     .master-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 1200px) {
+    header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .header-left,
+    .header-actions {
+        width: 100%;
+    }
+
+    #fx-container {
+        min-width: 0;
+        flex-wrap: wrap;
+    }
+
+    #fx-monitor {
+        flex: 1 1 auto;
+    }
+
+    .sync-info {
+        border-left: none;
+        padding-left: 0;
+    }
 }
