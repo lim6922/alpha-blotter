@@ -47,7 +47,7 @@ header {
 /* 실시간 시세 및 동기화 정보 컨테이너 */
 #fx-container {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     flex: 1 1 720px;
     gap: 10px;
     background: rgba(255, 255, 255, 0.03);
@@ -89,10 +89,12 @@ header {
 
 #fx-monitor {
     display: flex;
-    gap: 14px;
+    gap: 10px;
     align-items: center;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     min-width: 0;
+    flex: 1 1 auto;
+    row-gap: 4px;
 }
 
 .price-tag {
@@ -110,6 +112,7 @@ header {
     padding-left: 8px;
     margin-left: 2px;
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 /* =========================================================================
@@ -522,14 +525,17 @@ button {
     #fx-container {
         min-width: 0;
         flex-wrap: wrap;
+        align-items: center;
     }
 
     #fx-monitor {
-        flex: 1 1 auto;
+        flex: 1 1 100%;
     }
 
     .sync-info {
         border-left: none;
         padding-left: 0;
+        margin-left: 0;
+        width: 100%;
     }
 }
