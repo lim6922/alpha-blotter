@@ -937,7 +937,7 @@ async function syncMarketPrices() {
     }
 
     const now = new Date().toLocaleTimeString();
-    syncDisplay.innerText = updatedCount === assetKeys.length ? `전체 갱신 완료: ${now}` : `일부 갱신 (${updatedCount}/${assetKeys.length}): ${now}`;
+    syncDisplay.innerText = updatedCount === assetKeys.length ? `전체 갱신: ${now}` : `일부 갱신 (${updatedCount}/${assetKeys.length}): ${now}`;
     
     renderAll(); 
     runCalc();   
