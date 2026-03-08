@@ -1031,13 +1031,12 @@ const positionStats = {};
 
   let rKRW_Total = 0, rKRW_Dom = 0, rUSD_Ovs = 0;
   let tFeeKRW = 0, feeKRW_Dom = 0, feeUSD_Ovs = 0;
-  let winSum = 0, lossSum = 0, winCount = 0, lossCount = 0;
 
   const processed = sorted.map((t, idx) => {
     const key = `${t.asset}_${t.maturity}`;
 
 if (!positionStats[key]) {
-  positionStats[key] = { netPnlKRW: 0, isClosed: false };
+  positionStats[key] = { netPnlKRW: 0, isClosed: false, hasOpen: false, hasClose: false };
 }
     if (!inventory[key]) inventory[key] = [];
 
@@ -1084,6 +1083,9 @@ if (netQty === 0) {
 }
 
     const netPnlKRW = realizedThisTradeKRW - feeThisKRW;
+
+    if (realizedThisTradeKRW !== 0) positionStats[key].hasClose = true;
+    else positionStats[key].hasOpen = true;
 
 // ✅ 포지션 단위 누적 손익
 positionStats[key].netPnlKRW += netPnlKRW;
@@ -1153,7 +1155,7 @@ const moveOvs = atmRecords.filter(r => r.acc === 'OVS').reduce((s, r) => s + saf
 let posWin = 0, posLoss = 0, posWinSum = 0, posLossSum = 0;
 
 Object.values(positionStats).forEach(p => {
-  if (!p.isClosed) return; // 🔑 청산된 포지션만 평가
+  if (!p.isClosed || !p.hasOpen || !p.hasClose) return; // 🔑 오픈+청산이 완결된 포지션만 평가
 
   if (p.netPnlKRW > 0) {
     posWin++;
@@ -1161,6 +1163,19 @@ Object.values(positionStats).forEach(p => {
   } else if (p.netPnlKRW < 0) {
     posLoss++;
     posLossSum += Math.abs(p.netPnlKRW);
+  }
+});
+
+	// 체결 승률은 포지션 오픈 체결이 아닌, 실현손익이 발생한 체결(청산 페어)에 대해서만 계산
+let tradeWin = 0, tradeLoss = 0, tradeWinSum = 0, tradeLossSum = 0;
+processed.forEach(t => {
+  if (!t.isCloseTrade) return;
+  if (t.netPnlKRW > 0) {
+    tradeWin++;
+    tradeWinSum += t.netPnlKRW;
+  } else if (t.netPnlKRW < 0) {
+    tradeLoss++;
+    tradeLossSum += Math.abs(t.netPnlKRW);
   }
 });
 
@@ -1172,7 +1187,7 @@ return {
   posLossSum,
 
   rKRW_Dom, rUSD_Ovs, unrealizedKRW, feeKRW_Dom, feeUSD_Ovs,
-  winSum, lossSum, winCount, lossCount, totalTrades: winCount + lossCount,
+  tradeWin, tradeLoss, tradeWinSum, tradeLossSum, tradeTotal: tradeWin + tradeLoss,
   // 수정된 부분: 초기자본(capitals) + 입출금누계(move) + 매매손익
   eqDom: capitals.dom + moveDom + rKRW_Dom + uDom - feeKRW_Dom,
   eqOvs: capitals.ovs + moveOvs + rUSD_Ovs + uOvsPoint - feeUSD_Ovs
@@ -1281,24 +1296,11 @@ function renderAll() {
 
   // ---------------------------------------------------------
   // 1. 체결(Trade) 기준 성과 지표 계산
-  // 모든 매매 건별(Open/Close 포함) 손익을 기반으로 승률과 PF를 산출합니다.
+  // 실현손익이 발생한 청산 체결(OPEN 제외) 손익을 기반으로 승률과 PF를 산출합니다.
   // ---------------------------------------------------------
-  let tradeWin = 0, tradeLoss = 0;
-  let tradeWinSum = 0, tradeLossSum = 0;
-
-  res.processed.forEach(t => {
-    if (t.netPnlKRW > 0) {
-      tradeWin++;
-      tradeWinSum += t.netPnlKRW;
-    } else if (t.netPnlKRW < 0) {
-      tradeLoss++;
-      tradeLossSum += Math.abs(t.netPnlKRW);
-    }
-  });
-
-  const tradeTotal = tradeWin + tradeLoss;
-  const tradeWinRate = tradeTotal > 0 ? ((tradeWin / tradeTotal) * 100).toFixed(1) : "0.0";
-  const tradePF = tradeLossSum > 0 ? (tradeWinSum / tradeLossSum).toFixed(2) : (tradeWinSum > 0 ? "∞" : "0.00");
+  const tradeTotal = res.tradeTotal;
+  const tradeWinRate = tradeTotal > 0 ? ((res.tradeWin / tradeTotal) * 100).toFixed(1) : "0.0";
+  const tradePF = res.tradeLossSum > 0 ? (res.tradeWinSum / res.tradeLossSum).toFixed(2) : (res.tradeWinSum > 0 ? "∞" : "0.00");
 
   // ---------------------------------------------------------
   // 2. 우측 사이드바: 계좌 자산 및 리스크 지표 업데이트
@@ -2128,21 +2130,25 @@ function renderPerformanceReport() {
     totalRealized += t.realizedPnlKRW;
     totalFee += t.feeKRW;
 
-    // 2. 체결 기준 집계 (건별)
-    if (t.netPnlKRW > 0) {
-      tWin++;
-      tWinSum += t.netPnlKRW;
-    } else if (t.netPnlKRW < 0) {
-      tLoss++;
-      tLossSum += Math.abs(t.netPnlKRW);
+    // 2. 체결 기준 집계 (청산 체결만)
+    if (t.isCloseTrade) {
+      if (t.netPnlKRW > 0) {
+        tWin++;
+        tWinSum += t.netPnlKRW;
+      } else if (t.netPnlKRW < 0) {
+        tLoss++;
+        tLossSum += Math.abs(t.netPnlKRW);
+      }
     }
 
     // 3. 포지션 기준 집계를 위한 그룹화
     const key = `${t.asset}_${t.maturity}`;
     if (!periodPositionStats[key]) {
-      periodPositionStats[key] = { netPnlKRW: 0, isClosed: false };
+      periodPositionStats[key] = { netPnlKRW: 0, isClosed: false, hasOpen: false, hasClose: false };
     }
     periodPositionStats[key].netPnlKRW += t.netPnlKRW;
+    if (t.isCloseTrade) periodPositionStats[key].hasClose = true;
+    else periodPositionStats[key].hasOpen = true;
     if (t.currentNetQty === 0) periodPositionStats[key].isClosed = true;
 
     // 4. 테이블 행 추가
@@ -2173,7 +2179,7 @@ function renderPerformanceReport() {
   // 포지션 기준 승률/PF (청산 완료된 포지션만)
   let pWin = 0, pLoss = 0, pWinSum = 0, pLossSum = 0;
   Object.values(periodPositionStats).forEach(p => {
-    if (!p.isClosed) return; 
+    if (!p.isClosed || !p.hasOpen || !p.hasClose) return
     if (p.netPnlKRW > 0) { pWin++; pWinSum += p.netPnlKRW; }
     else if (p.netPnlKRW < 0) { pLoss++; pLossSum += Math.abs(p.netPnlKRW); }
   });
