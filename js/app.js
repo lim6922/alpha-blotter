@@ -1762,6 +1762,7 @@ function renderMaster() {
       </div>`;
     calcSelect.innerHTML += `<option value="${k}">${k}</option>`;
   });
+  initReportAssetFilter();
 }
 
 /**
@@ -1948,6 +1949,17 @@ function initAssetSelect() {
   s.innerHTML = "";
   Object.keys(master).forEach(k => s.innerHTML += `<option value="${k}">${k}</option>`);
   if (!s.value) s.value = Object.keys(master)[0] || "";
+  initReportAssetFilter();
+}
+
+function initReportAssetFilter() {
+  const reportSelect = document.getElementById("repAssetFilter");
+  if (!reportSelect) return;
+
+  const prev = reportSelect.value || "ALL";
+  reportSelect.innerHTML = `<option value="ALL">전체 상품</option>`;
+  Object.keys(master).forEach(k => reportSelect.innerHTML += `<option value="${k}">${k}</option>`);
+  reportSelect.value = Object.prototype.hasOwnProperty.call(master, prev) ? prev : "ALL";
 }
 // 전역 변수에 위젯 저장 객체 추가
 let tvWidget = null;
@@ -2143,15 +2155,16 @@ window.onload = async () => {
 function renderPerformanceReport() {
   const start = document.getElementById('repStartDate').value;
   const end = document.getElementById('repEndDate').value;
+  const assetFilter = document.getElementById('repAssetFilter')?.value || "ALL";
 
   const res = calculateEngine();
   const processed = res.processed;
   // 선택한 기간에 해당하는 거래만 필터링
-  const filtered = processed.filter(t => (!start || t.date >= start) && (!end || t.date <= end));
+  const filtered = processed.filter(t => (!start || t.date >= start) && (!end || t.date <= end) && (assetFilter === "ALL" || t.asset === assetFilter));
 
   // --- [데이터 집계 변수] ---
-  let totalRealized = 0;
-  let totalFee = 0;
+  let realizedKRW = 0, realizedUSD = 0;
+  let feeKRW = 0, feeUSD = 0;
 
   // 체결(Trade) 기준 변수
   let tWin = 0, tLoss = 0;
@@ -2164,8 +2177,13 @@ function renderPerformanceReport() {
 
   filtered.forEach(t => {
     // 1. 기본 손익/수수료 누적
-    totalRealized += t.realizedPnlKRW;
-    totalFee += t.feeKRW;
+    if (t.cur === "USD") {
+      realizedUSD += t.realizedPnlCur;
+      feeUSD += t.feeCur;
+    } else {
+      realizedKRW += t.realizedPnlCur;
+      feeKRW += t.feeCur;
+    }
 
     // 2. 체결 기준 집계 (전체 거래 단위)
     // 수수료로만 마이너스인 경우(실현손익 0)는 패배로 보지 않고 중립 처리
@@ -2213,9 +2231,22 @@ function renderPerformanceReport() {
   const pPF = pLossSum > 0 ? (pWinSum / pLossSum).toFixed(2) : (pWinSum > 0 ? "∞" : "0.00");
 
   // --- [UI 업데이트] ---
-  document.getElementById('rep-realized').innerText = Math.round(totalRealized).toLocaleString();
-  document.getElementById('rep-fee').innerText = "-" + Math.round(totalFee).toLocaleString();
-  document.getElementById('rep-net').innerText = Math.round(totalRealized - totalFee).toLocaleString();
+  const realizedKRWTotal = realizedKRW + (realizedUSD * globalFX);
+  const feeKRWTotal = feeKRW + (feeUSD * globalFX);
+  const netKRWTotal = realizedKRWTotal - feeKRWTotal;
+
+  document.getElementById('rep-realized').innerText = Math.round(realizedKRWTotal).toLocaleString();
+  document.getElementById('rep-fee').innerText = "-" + Math.round(feeKRWTotal).toLocaleString();
+  document.getElementById('rep-net').innerText = Math.round(netKRWTotal).toLocaleString();
+
+  const netKRW = realizedKRW - feeKRW;
+  const netUSD = realizedUSD - feeUSD;
+  const repRealizedBreakdown = document.getElementById('rep-realized-breakdown');
+  if (repRealizedBreakdown) repRealizedBreakdown.innerText = "₩" + Math.round(realizedKRW).toLocaleString() + " / $" + realizedUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const repFeeBreakdown = document.getElementById('rep-fee-breakdown');
+  if (repFeeBreakdown) repFeeBreakdown.innerText = "₩" + Math.round(feeKRW).toLocaleString() + " / $" + feeUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const repNetBreakdown = document.getElementById('rep-net-breakdown');
+  if (repNetBreakdown) repNetBreakdown.innerText = "₩" + Math.round(netKRW).toLocaleString() + " / $" + netUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   
   // 승률 표시 (체결 / 포지션)
   document.getElementById('rep-winrate').innerHTML = 
