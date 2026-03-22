@@ -1351,14 +1351,19 @@ function renderAll() {
   // ---------------------------------------------------------
   // 3. 중앙 대시보드: 실현 손익 상단 카드 업데이트
   // ---------------------------------------------------------
-  document.getElementById('total-realized-krw').innerText = Math.round(res.netRealizedKRW).toLocaleString();
-  const realizedPct = capitals.dom ? (res.netRealizedKRW / capitals.dom) * 100 : 0;
-  document.getElementById('total-realized-pct').innerText = realizedPct.toFixed(1) + "%";
-
+  const netRealizedKRWDom = res.rKRW_Dom - res.feeKRW_Dom;
   const netRealizedUSD = res.rUSD_Ovs - res.feeUSD_Ovs;
-  document.getElementById('total-realized-usd').innerText = netRealizedUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const realizedPctUSD = capitals.ovs ? (netRealizedUSD / capitals.ovs) * 100 : 0;
-  document.getElementById('total-realized-usd-pct').innerText = realizedPctUSD.toFixed(1) + "%";
+  const netRealizedKRWTotal = netRealizedKRWDom + (netRealizedUSD * globalFX);
+
+  document.getElementById("total-realized-krw").innerText = Math.round(netRealizedKRWTotal).toLocaleString();
+  const capitalTotalKRW = capitals.dom + (capitals.ovs * globalFX);
+  const realizedPct = capitalTotalKRW ? (netRealizedKRWTotal / capitalTotalKRW) * 100 : 0;
+  document.getElementById("total-realized-pct").innerText = realizedPct.toFixed(1) + "%";
+
+  const realizedBreakdownEl = document.getElementById("total-realized-breakdown");
+  if (realizedBreakdownEl) {
+    realizedBreakdownEl.innerText = "₩" + Math.round(netRealizedKRWDom).toLocaleString() + " / $" + netRealizedUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
 
   // ---------------------------------------------------------
   // 4. 미실현(평가) 손익률 및 가중치 계산
