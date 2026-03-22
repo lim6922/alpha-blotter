@@ -1355,6 +1355,11 @@ function renderAll() {
   const realizedPct = capitals.dom ? (res.netRealizedKRW / capitals.dom) * 100 : 0;
   document.getElementById('total-realized-pct').innerText = realizedPct.toFixed(1) + "%";
 
+  const netRealizedUSD = res.rUSD_Ovs - res.feeUSD_Ovs;
+  document.getElementById('total-realized-usd').innerText = netRealizedUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const realizedPctUSD = capitals.ovs ? (netRealizedUSD / capitals.ovs) * 100 : 0;
+  document.getElementById('total-realized-usd-pct').innerText = realizedPctUSD.toFixed(1) + "%";
+
   // ---------------------------------------------------------
   // 4. 미실현(평가) 손익률 및 가중치 계산
   // 각 포지션의 규모에 따라 평균적인 수익률(Weighted PnL%)을 계산합니다.
