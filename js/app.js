@@ -1952,14 +1952,18 @@ function initAssetSelect() {
   initReportAssetFilter();
 }
 
-function initReportAssetFilter() {
+function initReportAssetFilter(sourceTrades = trades) {
   const reportSelect = document.getElementById("repAssetFilter");
   if (!reportSelect) return;
 
   const prev = reportSelect.value || "ALL";
+  const idsFromMaster = Object.keys(master || {});
+  const idsFromTrades = Array.from(new Set((sourceTrades || []).map(t => t.asset).filter(Boolean)));
+  const assetIds = Array.from(new Set([...idsFromMaster, ...idsFromTrades])).sort();
+
   reportSelect.innerHTML = `<option value="ALL">전체 상품</option>`;
-  Object.keys(master).forEach(k => reportSelect.innerHTML += `<option value="${k}">${k}</option>`);
-  reportSelect.value = Object.prototype.hasOwnProperty.call(master, prev) ? prev : "ALL";
+  assetIds.forEach(k => reportSelect.innerHTML += `<option value="${k}">${k}</option>`);
+  reportSelect.value = assetIds.includes(prev) ? prev : "ALL";
 }
 // 전역 변수에 위젯 저장 객체 추가
 let tvWidget = null;
@@ -2151,14 +2155,13 @@ window.onload = async () => {
  * 리포트 및 세팅용 추가 함수
  */
 
-// 1. 퍼포먼스 리포트 렌더링
 function renderPerformanceReport() {
   const start = document.getElementById('repStartDate').value;
   const end = document.getElementById('repEndDate').value;
-  const assetFilter = document.getElementById('repAssetFilter')?.value || "ALL";
-
   const res = calculateEngine();
   const processed = res.processed;
+  initReportAssetFilter(processed);
+  const assetFilter = document.getElementById("repAssetFilter")?.value || "ALL";
   // 선택한 기간에 해당하는 거래만 필터링
   const filtered = processed.filter(t => (!start || t.date >= start) && (!end || t.date <= end) && (assetFilter === "ALL" || t.asset === assetFilter));
 
