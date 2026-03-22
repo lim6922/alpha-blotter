@@ -1,0 +1,10 @@
+{
+  "name": "Node + Codex + Gemini",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+  "postCreateCommand": "/bin/bash .devcontainer/setup-tools.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": []
+    }
+  }
+}

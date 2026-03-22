@@ -1041,6 +1041,7 @@ function calculateEngine() {
 
     let remain = t.qty;
     let realizedThisTradeKRW = 0;
+    let realizedThisTradeCur = 0;
     let totalMatchValue = 0; // 수익률 계산용 매입원가 합계
 
     if (inventory[key].length > 0 && inventory[key][0].side !== t.side) {
@@ -1051,8 +1052,10 @@ function calculateEngine() {
         const diff = (t.side === "Sell") ? (t.price - matchingLot.price) : (matchingLot.price - t.price);
         const pnlPoint = (diff / m.tick) * m.tickVal * matchQty;
         const pnlKRW = (m.cur === "USD") ? pnlPoint * t.fxRate : pnlPoint;
+        const pnlCur = (m.cur === "USD") ? pnlPoint : pnlKRW;
 
         realizedThisTradeKRW += pnlKRW;
+        realizedThisTradeCur += pnlCur;
         totalMatchValue += (matchingLot.price * matchQty); // 원가 누적
         rKRW_Total += pnlKRW;
         
@@ -1071,6 +1074,7 @@ function calculateEngine() {
     const netQty = inventory[key].reduce((acc, lot) => acc + (lot.side === 'Buy' ? lot.qty : -lot.qty), 0);
 
     const netPnlKRW = realizedThisTradeKRW - feeThisKRW;
+    const netPnlCur = realizedThisTradeCur - feeThisCur;
 
     // --- 수정: 수익률(netPct) 계산 로직 추가 ---
     let netPct = 0;
@@ -1090,6 +1094,10 @@ netPct = (realizedThisTradeKRW / costKRW) * 100;
 	  
     return {
       ...t,
+      cur: m.cur || "KRW",
+      realizedPnlCur: realizedThisTradeCur,
+      feeCur: feeThisCur,
+      netPnlCur: netPnlCur,
       realizedPnlKRW: realizedThisTradeKRW,
       feeKRW: feeThisKRW,
       netPnlKRW: netPnlKRW,
@@ -1558,7 +1566,13 @@ let statusLabel = `
         <td>${t.qty}</td>
         <td>${statusLabel}</td>
         <td>${t.stopLoss ?? '-'}</td>
-        <td class="${t.netPnlKRW >= 0 ? 'up' : 'down'}">${t.netPnlKRW !== 0 ? Math.round(t.netPnlKRW).toLocaleString() : '-'}</td>
+        <td class="${t.netPnlCur >= 0 ? 'up' : 'down'}">${
+          t.netPnlCur !== 0
+            ? (t.cur === "USD"
+                ? "$" + t.netPnlCur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                : Math.round(t.netPnlCur).toLocaleString())
+            : '-'
+        }</td>
         <td class="${t.netPct >= 0 ? 'up' : 'down'}">${t.netPct !== 0 ? t.netPct.toFixed(2) + '%' : '-'}</td>
         <td>
           <button onclick="editTrade(${t.id})" class="btn-edit">수정</button>
@@ -2163,9 +2177,9 @@ function renderPerformanceReport() {
         <td>${t.price.toLocaleString()}</td>
         <td>${t.qty}</td>
         <td><span class="pill">${statusLabel}</span></td>
-        <td>${Math.round(t.realizedPnlKRW).toLocaleString()}</td>
-        <td style="color:var(--bad)">${Math.round(t.feeKRW).toLocaleString()}</td>
-        <td><b>${Math.round(t.netPnlKRW).toLocaleString()}</b></td>
+        <td>${t.cur === "USD" ? "$" + t.realizedPnlCur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(t.realizedPnlCur).toLocaleString()}</td>
+        <td style="color:var(--bad)">${t.cur === "USD" ? "$" + t.feeCur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(t.feeCur).toLocaleString()}</td>
+        <td><b>${t.cur === "USD" ? "$" + t.netPnlCur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(t.netPnlCur).toLocaleString()}</b></td>
         <td class="${t.netPct >= 0 ? 'up' : 'down'}">${t.netPct.toFixed(2)}%</td>
         <td class="mono" style="font-size:10px; opacity:0.7;">${t.memo || '-'}</td>
       </tr>`;
