@@ -17,6 +17,7 @@ let autoSyncCanRun = false;
 let autoSyncTimer = null;
 let autoSyncInFlight = false;
 let autoSyncLastAttemptLocalAt = null;
+let autoImportFromCloudDone = false;
 
 function setAutoSyncStatus(text, className = '') {
   const statusEl = document.getElementById('autosync-status');
@@ -817,16 +818,16 @@ async function exportToCloud() {
   await exportToCloudInternal();
 }
 
-async function importFromCloud() {
-  const user = await getCurrentUserOrAlert();
-  if (!user) return;
+async function importFromCloudInternal({ user = null, skipConfirm = false, silent = false, source = 'manual' } = {}) {
+  const currentUser = user || await getCurrentUserOrAlert();
+  if (!currentUser) return false;
 
   try {
     // 1) trades 조회
     const { data: tradeRows, error: tradeError } = await supabaseClient
       .from('trades')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', currentUser.id)
       .order('date', { ascending: true });
 
     if (tradeError) throw tradeError;
@@ -835,7 +836,7 @@ async function importFromCloud() {
     const { data: atmRows, error: atmError } = await supabaseClient
       .from('atm_records')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', currentUser.id)
       .order('date', { ascending: false });
 
     if (atmError) throw atmError;
@@ -844,7 +845,7 @@ async function importFromCloud() {
     const { data: masterRows, error: masterError } = await supabaseClient
       .from('asset_master')
       .select('*')
-      .eq('user_id', user.id);
+      .eq('user_id', currentUser.id);
 
     if (masterError) throw masterError;
 
@@ -852,7 +853,7 @@ async function importFromCloud() {
     const { data: capitalRow, error: capitalError } = await supabaseClient
       .from('capitals')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', currentUser.id)
       .maybeSingle();
 
     if (capitalError) throw capitalError;
@@ -861,7 +862,7 @@ async function importFromCloud() {
     const { data: metaRow, error: metaError } = await supabaseClient
       .from('blotter_meta')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', currentUser.id)
       .maybeSingle();
 
     if (metaError) throw metaError;
@@ -914,19 +915,23 @@ async function importFromCloud() {
     const hasCapitals = !!capitalRow;
 
     if (!(hasTrades || hasATM || hasMaster || hasCapitals)) {
-      alert("동기화 데이터가 없습니다.");
-      return;
+      if (!silent) {
+        alert("동기화 데이터가 없습니다.");
+      }
+      return false;
     }
 
     // 8) 덮어쓰기 확인
-    const msg = `동기화 데이터를 발견했습니다:
+    if (!skipConfirm) {
+      const msg = `동기화 데이터를 발견했습니다:
 - 매매: ${remoteTrades.length}건
 - 입출금: ${remoteATM.length}건
 - 상품설정: ${Object.keys(remoteMaster).length}건
 
 기존 데이터를 덮어쓰시겠습니까?`;
 
-    if (!confirm(msg)) return;
+      if (!confirm(msg)) return false;
+    }
 
     // 9) 현재 메모리 상태 교체
     trades = remoteTrades;
@@ -962,11 +967,26 @@ async function importFromCloud() {
     renderAll();
     updateSyncHeader();
 
-    alert("동기화 가져오기가 완료되었습니다.");
+    if (!silent) {
+      alert("동기화 가져오기가 완료되었습니다.");
+    }
+
+    return true;
   } catch (error) {
     console.error(error);
-    alert("동기화 가져오기 실패: " + error.message);
+
+    if (!silent) {
+      alert("동기화 가져오기 실패: " + error.message);
+    } else if (source === 'auto-login') {
+      console.warn("auto import failed:", error.message);
+    }
+
+    return false;
   }
+}
+
+async function importFromCloud() {
+  await importFromCloudInternal();
 }
 
 /**
@@ -2277,8 +2297,6 @@ window.onload = async () => {
   updateSyncHeader();
   initAutoSyncUI();
 
-  await updateSyncAuthUI();
-
   const { data, error } = await supabaseClient.auth.getSession();
   if (error) {
     console.error("Supabase session restore failed:", error.message);
@@ -2287,12 +2305,18 @@ window.onload = async () => {
 
     if (!allowed) {
       await supabaseClient.auth.signOut();
-      await updateSyncAuthUI();
       alert("허용되지 않은 계정입니다. 관리자의 허용이 필요합니다.");
     } else {
       console.log("Supabase session restored:", data.session.user?.email || data.session.user?.id);
+
+      if (!autoImportFromCloudDone) {
+        autoImportFromCloudDone = true;
+        await importFromCloudInternal({ user: data.session.user, skipConfirm: true, silent: true, source: 'auto-login' });
+      }
     }
   }
+
+  await updateSyncAuthUI();
 };
 
 
