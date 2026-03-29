@@ -11,10 +11,9 @@ function saveMeta() {
   localStorage.setItem('blotter_meta_v96', JSON.stringify(blotterMeta));
 }
 
-const AUTO_SYNC_STORAGE_KEY = 'blotter_autosync_enabled_v1';
 const AUTO_SYNC_DEBOUNCE_MS = 4000;
 
-let autoSyncEnabled = localStorage.getItem(AUTO_SYNC_STORAGE_KEY) !== '0';
+let autoSyncCanRun = false;
 let autoSyncTimer = null;
 let autoSyncInFlight = false;
 let autoSyncLastAttemptLocalAt = null;
@@ -29,40 +28,11 @@ function setAutoSyncStatus(text, className = '') {
 }
 
 function initAutoSyncUI() {
-  const toggleEl = document.getElementById('autosync-toggle');
-  if (toggleEl) {
-    toggleEl.checked = autoSyncEnabled;
-  }
-
-  if (!autoSyncEnabled) {
-    setAutoSyncStatus('OFF');
-    return;
-  }
-
-  setAutoSyncStatus('ON', 'sync-ok');
-  maybeScheduleAutoSync();
-}
-
-function toggleAutoSync(event) {
-  autoSyncEnabled = !!event?.target?.checked;
-  localStorage.setItem(AUTO_SYNC_STORAGE_KEY, autoSyncEnabled ? '1' : '0');
-
-  if (!autoSyncEnabled) {
-    if (autoSyncTimer) {
-      clearTimeout(autoSyncTimer);
-      autoSyncTimer = null;
-    }
-    autoSyncInFlight = false;
-    setAutoSyncStatus('OFF');
-    return;
-  }
-
-  setAutoSyncStatus('ON', 'sync-ok');
-  maybeScheduleAutoSync();
+  autoSyncCanRun = false;
 }
 
 function maybeScheduleAutoSync(statusOverride = null) {
-  if (!autoSyncEnabled || autoSyncInFlight) return;
+  if (!autoSyncCanRun || autoSyncInFlight) return;
 
   const status = statusOverride || getSyncStatus(
     blotterMeta.lastLocalInputAt,
@@ -124,7 +94,7 @@ async function getCurrentUserSilently() {
 }
 
 async function runAutoSyncIfNeeded() {
-  if (!autoSyncEnabled || autoSyncInFlight) return;
+  if (!autoSyncCanRun || autoSyncInFlight) return;
 
   const status = getSyncStatus(
     blotterMeta.lastLocalInputAt,
@@ -319,6 +289,7 @@ async function updateSyncAuthUI() {
   const { data, error } = await supabaseClient.auth.getSession();
 
   if (error) {
+    autoSyncCanRun = false;
     statusEl.innerText = '로그인 확인 실패';
     statusEl.classList.remove('sync-auth-on');
     statusEl.classList.add('sync-auth-off');
@@ -336,16 +307,15 @@ async function updateSyncAuthUI() {
     statusEl.classList.add('sync-auth-on');
 
     if (btnEl) btnEl.innerText = '로그아웃';
+    autoSyncCanRun = true;
+    maybeScheduleAutoSync();
   } else {
+    autoSyncCanRun = false;
     statusEl.innerText = '로그인 필요';
     statusEl.classList.remove('sync-auth-on');
     statusEl.classList.add('sync-auth-off');
 
     if (btnEl) btnEl.innerText = '동기화 로그인';
-  }
-
-  if (autoSyncEnabled) {
-    maybeScheduleAutoSync();
   }
 }
 
@@ -2528,11 +2498,6 @@ function updateSyncHeader() {
     importEl.classList.add('sync-danger');
     localEl.classList.add('sync-warn');
     exportEl.classList.add('sync-warn');
-  }
-
-  if (!autoSyncEnabled) {
-    setAutoSyncStatus('OFF');
-    return;
   }
 
   maybeScheduleAutoSync(status);
