@@ -13,7 +13,15 @@ function saveMeta() {
 
 function fmtTime(ts) {
   if (!ts) return "-";
-  return new Date(ts).toLocaleString();
+  const d = new Date(Number(ts));
+  if (Number.isNaN(d.getTime())) return "-";
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${yyyy}.${mm}.${dd} ${hh}:${mi}:${ss}`;
 }
 
 /**
@@ -147,53 +155,273 @@ function getTimestamp() {
     + String(now.getMinutes()).padStart(2, '0');
 }
 
-function exportToCSV() {
 
-  // --- META ---
+
+async function updateSyncAuthUI() {
+  const statusEl = document.getElementById('sync-auth-status');
+  const btnEl = document.getElementById('syncAuthBtn');
+
+  if (!statusEl) return;
+
+  const { data, error } = await supabaseClient.auth.getSession();
+
+  if (error) {
+    statusEl.innerText = '로그인 확인 실패';
+    statusEl.classList.remove('sync-auth-on');
+    statusEl.classList.add('sync-auth-off');
+
+    if (btnEl) btnEl.innerText = '동기화 로그인';
+    return;
+  }
+
+  const user = data?.session?.user;
+
+  if (user) {
+    const email = user.email || 'Google User';
+    statusEl.innerText = `로그인됨 · ${email}`;
+    statusEl.classList.remove('sync-auth-off');
+    statusEl.classList.add('sync-auth-on');
+
+    if (btnEl) btnEl.innerText = '로그아웃';
+  } else {
+    statusEl.innerText = '로그인 필요';
+    statusEl.classList.remove('sync-auth-on');
+    statusEl.classList.add('sync-auth-off');
+
+    if (btnEl) btnEl.innerText = '동기화 로그인';
+  }
+}
+
+async function getCurrentUserOrAlert() {
+  const { data, error } = await supabaseClient.auth.getSession();
+
+  if (error || !data?.session?.user) {
+    alert("먼저 동기화 로그인(Google 로그인)을 해주세요.");
+    return null;
+  }
+
+  const user = data.session.user;
+  const allowed = await isAllowedEmail(user.email);
+
+  if (!allowed) {
+    await supabaseClient.auth.signOut();
+    await updateSyncAuthUI();
+    alert("허용되지 않은 계정입니다. 관리자의 허용이 필요합니다.");
+    return null;
+  }
+
+  return user;
+}
+
+function toISOStringSafeFromMillis(ms) {
+  if (!ms) return new Date().toISOString();
+
+  const d = new Date(ms);
+  if (isNaN(d.getTime())) {
+    return new Date().toISOString();
+  }
+
+  return d.toISOString();
+}
+
+
+
+
+
+async function isAllowedEmail(email) {
+  if (!email) return false;
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  if (!normalizedEmail) return false;
+
+  const { data, error } = await supabaseClient
+    .from('allowed_emails')
+    .select('email')
+    .eq('email', normalizedEmail)
+    .limit(1);
+
+  if (error) {
+    console.error('허용 이메일 확인 실패:', error.message);
+    return false;
+  }
+
+  return Array.isArray(data) && data.length > 0;
+}
+
+function buildCSVSnapshot() {
   let csv = "---META---\nLAST_LOCAL_INPUT_AT\n";
   csv += `${blotterMeta.lastLocalInputAt || ""}\n\n`;
-
-  // --- TRADES ---
-
+	
   csv += "---TRADES---\nDate,Asset,Maturity,Side,Price,Qty,FXRate,StopLoss,Memo,CreatedAt,UpdatedAt\n";
-trades.forEach(t => {
-  const memo = (t.memo || "")
-  .replace(/\r?\n/g, "\\n")   // 줄바꿈 안전 처리
-  .replace(/"/g,'""');       // 따옴표 escape
-  csv += `${t.date},${t.asset},${t.maturity},${t.side},${t.price},${t.qty},${t.fxRate},${t.stopLoss ?? ""},"${memo}",${t.createdAt},${t.updatedAt}\n`;
-});
+  trades.forEach(t => {
+    const memo = (t.memo || "")
+      .replace(/\r?\n/g, "\\n")
+      .replace(/"/g,'""');
+    csv += `${t.date},${t.asset},${t.maturity},${t.side},${t.price},${t.qty},${t.fxRate},${t.stopLoss ?? ""},"${memo}",${t.createdAt},${t.updatedAt}\n`;
+  });
 
-  // 2. 상품 마스터 섹션
   csv += "\n---MASTER---\nAsset,Symbol,YSymbol,Tick,TickVal,Fee,Cur,MarginType,InitMargin,MaintMargin,Multiplier,Desc\n";
   Object.keys(master).forEach(k => {
     const m = master[k];
     csv += `${k},${m.symbol||""},${m.ySymbol||""},${m.tick},${m.tickVal},${m.fee},${m.cur},${m.marginType||"FIXED"},${m.initMargin||0},${m.maintMargin||0},${m.multiplier||0},"${(m.desc||"")
-  .replace(/\r?\n/g,"\\n")
-  .replace(/"/g,'""')}"\n`;
+      .replace(/\r?\n/g,"\\n")
+      .replace(/"/g,'""')}"\n`;
   });
 
-  // 3. ATM(입출금) 섹션
   csv += "\n---ATM---\nDate,Account,Amount,Memo\n";
   atmRecords.forEach(r => {
-    const memo = (r.memo || "").replace(/"/g, '""');
+    const memo = (r.memo || "")
+      .replace(/\r?\n/g, "\\n")
+      .replace(/"/g, '""');
     csv += `${r.date},${r.acc},${r.amt},"${memo}"\n`;
   });
 
-  // 4. 초기 자본금 섹션 (추가됨)
   csv += "\n---CAPITALS---\nDOM_KRW,OVS_USD\n";
   csv += `${capitals.dom},${capitals.ovs}\n`;
 
+    return csv;
+}
+
+function downloadCSV(csv, fileName) {
   const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement("a");
   link.setAttribute("href", URL.createObjectURL(blob));
-  link.setAttribute("download", `AlphaBlotter_v96_FullBackup_${getTimestamp()}.csv`);
+  link.setAttribute("download", fileName);
   link.click();
+}
 
-// EXPORT는 "데이터 생성 시점"을 기록해야 함
-blotterMeta.lastExportedInputAt = blotterMeta.lastLocalInputAt;
-saveMeta();
-updateSyncHeader();
+function exportToCSV() {
+  const csv = buildCSVSnapshot();
+  downloadCSV(csv, `AlphaBlotter_v96_FullBackup_${getTimestamp()}.csv`);
 
+  blotterMeta.lastExportedInputAt = blotterMeta.lastLocalInputAt;
+  saveMeta();
+  updateSyncHeader();
+}
+
+function parseAndApplyCSV(text, sourceLabel = "CSV") {
+  const normalizedText = text.replace(/^\uFEFF/, "");
+  const rows = normalizedText.split(/\r?\n/);
+  const newTrades = [];
+  const newATM = [];
+  const newMaster = {};
+  let newCapitals = { dom: 0, ovs: 0 };
+  let csvLocalInputAt = null;
+  let currentSection = "";
+
+  rows.forEach((row) => {
+    const tr = row.trim();
+    if (!tr) return;
+
+    if (tr === "---META---") { currentSection = "META"; return; }
+    if (tr === "---TRADES---") { currentSection = "TRADES"; return; }
+    if (tr === "---MASTER---") { currentSection = "MASTER"; return; }
+    if (tr === "---ATM---") { currentSection = "ATM"; return; }
+    if (tr === "---CAPITALS---") { currentSection = "CAPITALS"; return; }
+
+    if (tr.startsWith("Date,Asset,") || tr.startsWith("Asset,Symbol,") ||
+        tr.startsWith("Date,Account,") || tr.startsWith("DOM_KRW,") ||
+        tr === "LAST_LOCAL_INPUT_AT") return;
+
+    if (currentSection === "META") {
+      csvLocalInputAt = parseInt(tr, 10) || null;
+      return;
+    }
+
+    const parts = parseCSVLine(tr);
+
+    if (currentSection === "TRADES" && parts.length >= 10) {
+      newTrades.push({
+        id: parts[9] ? parseInt(parts[9], 10) : Date.now(),
+        date: parts[0],
+        asset: parts[1],
+        maturity: parts[2],
+        side: parts[3],
+        price: parseFloat(parts[4]),
+        qty: parseInt(parts[5]),
+        fxRate: parseFloat(parts[6]),
+        stopLoss: (parts[7] && parts[7] !== "") ? parseFloat(parts[7]) : null,
+        memo: (parts[8] || "").replace(/\\n/g, "\n"),
+        createdAt: parts[9] ? parseInt(parts[9]) : Date.now(),
+        updatedAt: parts[10] ? parseInt(parts[10]) : Date.now()
+      });
+    }
+
+    if (currentSection === "MASTER" && parts.length >= 11) {
+      newMaster[parts[0]] = {
+        symbol: parts[1],
+        ySymbol: parts[2],
+        tick: parseFloat(parts[3]),
+        tickVal: parseFloat(parts[4]),
+        fee: parseFloat(parts[5]),
+        cur: parts[6],
+        marginType: parts[7],
+        initMargin: parseFloat(parts[8]),
+        maintMargin: parseFloat(parts[9]),
+        multiplier: parseFloat(parts[10]),
+        desc: (parts[11] || "").replace(/\\n/g, "\n")
+      };
+    }
+
+    if (currentSection === "ATM" && parts.length >= 3) {
+      newATM.push({
+        id: Date.now(),
+        date: parts[0],
+        acc: parts[1],
+        amt: parseFloat(parts[2]),
+        memo: (parts[3] || "").replace(/\\n/g, "\n")
+      });
+    }
+
+    if (currentSection === "CAPITALS" && parts.length >= 2) {
+      newCapitals.dom = parseFloat(parts[0]) || 0;
+      newCapitals.ovs = parseFloat(parts[1]) || 0;
+    }
+  });
+
+  const hasTrades = newTrades.length > 0;
+  const hasATM = newATM.length > 0;
+  const hasMaster = Object.keys(newMaster).length > 0;
+  const hasCapitals = newCapitals.dom !== 0 || newCapitals.ovs !== 0;
+
+  if (!(hasTrades || hasATM || hasMaster || hasCapitals)) {
+    alert(`${sourceLabel} 데이터에서 유효한 항목을 찾을 수 없습니다.`);
+    return false;
+  }
+
+  const msg = `${sourceLabel} 데이터를 발견했습니다:
+- 매매: ${newTrades.length}건
+- 입출금: ${newATM.length}건
+- 상품설정: ${Object.keys(newMaster).length}건
+
+기존 데이터를 덮어쓰시겠습니까?`;
+  if (!confirm(msg)) return false;
+
+  localStorage.setItem('blotter_backup_before_import', localStorage.getItem('blotter_trades_v96'));
+
+  trades = newTrades;
+  atmRecords = newATM;
+  capitals = newCapitals;
+  if (hasMaster) master = newMaster;
+
+  localStorage.setItem('blotter_trades_v96', JSON.stringify(trades));
+  localStorage.setItem('blotter_atm_v96', JSON.stringify(atmRecords));
+  localStorage.setItem('blotter_master_v96', JSON.stringify(master));
+  localStorage.setItem('blotter_capitals_v96', JSON.stringify(capitals));
+
+  loadCapitals();
+  renderMaster();
+  initAssetSelect();
+  if (typeof renderATM === "function") renderATM();
+  renderAll();
+
+  blotterMeta.lastImportedInputAt = csvLocalInputAt;
+  blotterMeta.lastLocalInputAt = csvLocalInputAt || Date.now();
+  saveMeta();
+  updateSyncHeader();
+
+  alert(`${sourceLabel} 가져오기가 완료되었습니다.`);
+  return true;
 }
 
 function importFromCSV(e) {
@@ -201,139 +429,399 @@ function importFromCSV(e) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = (event) => {
-    let text = event.target.result;
-    text = text.replace(/^\uFEFF/, ""); // BOM(바이트 오더 마크) 제거
-
-    const rows = text.split(/\r?\n/); // 윈도우/맥 줄바꿈 모두 대응
-    const newTrades = [];
-    const newATM = [];
-    const newMaster = {};
-    let newCapitals = { dom: 0, ovs: 0 };
-    let csvLocalInputAt = null;
-    let currentSection = "";
-
-    rows.forEach((row) => {
-      const tr = row.trim();
-      if (!tr) return; // 빈 줄 건너뛰기
-
-      // --- 섹션 헤더 감지 ---
-      if (tr === "---META---")    { currentSection = "META"; return; }
-      if (tr === "---TRADES---")  { currentSection = "TRADES"; return; }
-      if (tr === "---MASTER---")  { currentSection = "MASTER"; return; }
-      if (tr === "---ATM---")     { currentSection = "ATM"; return; }
-      if (tr === "---CAPITALS---") { currentSection = "CAPITALS"; return; }
-
-      // 각 섹션의 테이블 헤더 줄 건너뛰기
-      if (tr.startsWith("Date,Asset,") || tr.startsWith("Asset,Symbol,") || 
-          tr.startsWith("Date,Account,") || tr.startsWith("DOM_KRW,") ||
-          tr === "LAST_LOCAL_INPUT_AT") return;
-
-      // --- 데이터 파싱 ---
-      if (currentSection === "META") {
-        csvLocalInputAt = parseInt(tr, 10) || null;
-        return;
-      }
-
-      const parts = parseCSVLine(tr);
-
-      // 1. 매매 기록 (TRADES)
-      if (currentSection === "TRADES" && parts.length >= 10) {
-        newTrades.push({
-          id: parts[9] ? parseInt(parts[9]) + Math.random() : Date.now() + Math.random(), // ID 중복 방지
-          date: parts[0],
-          asset: parts[1],
-          maturity: parts[2],
-          side: parts[3],
-          price: parseFloat(parts[4]),
-          qty: parseInt(parts[5]),
-          fxRate: parseFloat(parts[6]),
-          stopLoss: (parts[7] && parts[7] !== "") ? parseFloat(parts[7]) : null,
-          memo: (parts[8] || "").replace(/\\n/g, "\n"),
-          createdAt: parts[9] ? parseInt(parts[9]) : Date.now(),
-          updatedAt: parts[10] ? parseInt(parts[10]) : Date.now()
-        });
-      }
-
-      // 2. 상품 마스터 (MASTER)
-      if (currentSection === "MASTER" && parts.length >= 11) {
-        newMaster[parts[0]] = {
-          symbol: parts[1],
-          ySymbol: parts[2],
-          tick: parseFloat(parts[3]),
-          tickVal: parseFloat(parts[4]),
-          fee: parseFloat(parts[5]),
-          cur: parts[6],
-          marginType: parts[7],
-          initMargin: parseFloat(parts[8]),
-          maintMargin: parseFloat(parts[9]),
-          multiplier: parseFloat(parts[10]),
-          desc: (parts[11] || "").replace(/\\n/g, "\n")
-        };
-      }
-
-      // 3. 입출금 기록 (ATM)
-      if (currentSection === "ATM" && parts.length >= 3) {
-        newATM.push({
-          id: Date.now() + Math.random(),
-          date: parts[0],
-          acc: parts[1],
-          amt: parseFloat(parts[2]),
-          memo: (parts[3] || "").replace(/\\n/g, "\n")
-        });
-      }
-
-      // 4. 초기 자본금 (CAPITALS)
-      if (currentSection === "CAPITALS" && parts.length >= 2) {
-        newCapitals.dom = parseFloat(parts[0]) || 0;
-        newCapitals.ovs = parseFloat(parts[1]) || 0;
-      }
-    });
-
-    // 🔴 [핵심 수정] 데이터 존재 여부 통합 체크
-    const hasTrades = newTrades.length > 0;
-    const hasATM = newATM.length > 0;
-    const hasMaster = Object.keys(newMaster).length > 0;
-    const hasCapitals = newCapitals.dom !== 0 || newCapitals.ovs !== 0;
-
-    if (hasTrades || hasATM || hasMaster || hasCapitals) {
-      const msg = `데이터를 발견했습니다:\n- 매매: ${newTrades.length}건\n- 입출금: ${newATM.length}건\n- 상품설정: ${Object.keys(newMaster).length}건\n\n기존 데이터를 덮어쓰시겠습니까?`;
-      
-      if (confirm(msg)) {
-        // 백업 생성 (선택사항)
-        localStorage.setItem('blotter_backup_before_import', localStorage.getItem('blotter_trades_v96'));
-
-        // 실제 데이터 교체
-        trades = newTrades;
-        atmRecords = newATM;
-        capitals = newCapitals;
-        if (hasMaster) master = newMaster;
-
-        // 로컬 스토리지 저장
-        localStorage.setItem('blotter_trades_v96', JSON.stringify(trades));
-        localStorage.setItem('blotter_atm_v96', JSON.stringify(atmRecords));
-        localStorage.setItem('blotter_master_v96', JSON.stringify(master));
-        localStorage.setItem('blotter_capitals_v96', JSON.stringify(capitals));
-
-        // UI 즉시 갱신
-        loadCapitals();
-        renderMaster();
-        initAssetSelect();
-        if (typeof renderATM === "function") renderATM();
-        renderAll();
-
-        // 동기화 상태 업데이트
-        blotterMeta.lastImportedInputAt = csvLocalInputAt;
-        blotterMeta.lastLocalInputAt = csvLocalInputAt || Date.now();
-        saveMeta();
-        updateSyncHeader();
-
-        alert("가져오기가 완료되었습니다.");
-      }
-    } else {
-      alert("CSV 파일에서 유효한 데이터를 찾을 수 없습니다.");
-    }
+    parseAndApplyCSV(String(event.target.result || ""), "CSV 파일");
+    e.target.value = "";
   };
   reader.readAsText(file);
+}
+
+async function syncLogin() {
+  const { data: sessionData, error: sessionError } = await supabaseClient.auth.getSession();
+
+  if (sessionError) {
+    alert("세션 확인 실패: " + sessionError.message);
+    return;
+  }
+
+  if (sessionData?.session) {
+    alert("이미 로그인되어 있습니다.");
+    await updateSyncAuthUI();
+    return;
+  }
+
+  const redirectTo = window.location.origin + window.location.pathname;
+
+  const { error } = await supabaseClient.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo
+    }
+  });
+
+  if (error) {
+    alert("Google 로그인 실패: " + error.message);
+  }
+}
+
+async function syncLogout() {
+  const confirmed = confirm("로그아웃 하시겠습니까?");
+  if (!confirmed) return;
+
+  const { error } = await supabaseClient.auth.signOut();
+
+  if (error) {
+    alert("로그아웃 실패: " + error.message);
+    return;
+  }
+
+  await updateSyncAuthUI();
+  alert("로그아웃 되었습니다.");
+}
+
+async function handleSyncAuth() {
+  const { data, error } = await supabaseClient.auth.getSession();
+
+  if (error) {
+    alert("로그인 상태 확인 실패: " + error.message);
+    return;
+  }
+
+  const user = data?.session?.user;
+
+  if (user) {
+    const allowed = await isAllowedEmail(user.email);
+    if (!allowed) {
+      await supabaseClient.auth.signOut();
+      await updateSyncAuthUI();
+      alert("허용되지 않은 계정입니다. 관리자의 허용이 필요합니다.");
+      return;
+    }
+
+    const confirmed = confirm("로그아웃 하시겠습니까?");
+    if (!confirmed) return;
+
+    const { error: signOutError } = await supabaseClient.auth.signOut();
+    if (signOutError) {
+      alert("로그아웃 실패: " + signOutError.message);
+      return;
+    }
+
+    await updateSyncAuthUI();
+    alert("로그아웃 되었습니다.");
+    return;
+  }
+
+  // 로그인 안 된 상태 -> Google 로그인 시작
+  const redirectTo = window.location.origin + window.location.pathname;
+
+  const { error: signInError } = await supabaseClient.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo
+    }
+  });
+
+  if (signInError) {
+    alert("Google 로그인 실패: " + signInError.message);
+  }
+}
+
+function toSafeIntegerId(value) {
+  const n = Number(value);
+  if (Number.isFinite(n)) {
+    return Math.trunc(n);
+  }
+  return Date.now();
+}
+
+async function exportToCloud() {
+  const user = await getCurrentUserOrAlert();
+  if (!user) return;
+
+  const exportSummaryMsg = `현재 데이터를 원격 동기화 데이터로 저장합니다:
+- 매매: ${trades.length}건
+- 입출금: ${atmRecords.length}건
+- 상품설정: ${Object.keys(master).length}건
+
+기존 원격 데이터는 덮어써질 수 있습니다.
+계속하시겠습니까?`;
+  const confirmed = confirm(exportSummaryMsg);
+  if (!confirmed) return;
+
+  try {
+    const { error: delTradesError } = await supabaseClient
+      .from('trades')
+      .delete()
+      .eq('user_id', user.id);
+
+    if (delTradesError) throw delTradesError;
+
+    if (trades.length > 0) {
+      const tradeRows = trades.map(t => ({
+        user_id: user.id,
+        trade_id: toSafeIntegerId(t.id),
+        date: t.date,
+        asset: t.asset,
+        maturity: t.maturity || null,
+        side: t.side,
+        price: t.price,
+        qty: t.qty,
+        fx_rate: t.fxRate,
+        stop_loss: t.stopLoss,
+        memo: t.memo || "",
+        created_at: toISOStringSafeFromMillis(t.createdAt),
+        updated_at: toISOStringSafeFromMillis(t.updatedAt)
+      }));
+
+      const { error: insTradesError } = await supabaseClient
+        .from('trades')
+        .insert(tradeRows);
+
+      if (insTradesError) throw insTradesError;
+    }
+
+    const { error: delAtmError } = await supabaseClient
+      .from('atm_records')
+      .delete()
+      .eq('user_id', user.id);
+
+    if (delAtmError) throw delAtmError;
+
+    if (atmRecords.length > 0) {
+      const atmRows = atmRecords.map(r => ({
+        user_id: user.id,
+        record_id: toSafeIntegerId(r.id),
+        acc: r.acc,
+        date: r.date,
+        amt: r.amt,
+        memo: r.memo || ""
+      }));
+
+      const { error: insAtmError } = await supabaseClient
+        .from('atm_records')
+        .insert(atmRows);
+
+      if (insAtmError) throw insAtmError;
+    }
+
+    const { error: delMasterError } = await supabaseClient
+      .from('asset_master')
+      .delete()
+      .eq('user_id', user.id);
+
+    if (delMasterError) throw delMasterError;
+
+    const masterRows = Object.keys(master).map(assetCode => {
+      const m = master[assetCode];
+      return {
+        user_id: user.id,
+        asset_code: assetCode,
+        symbol: m.symbol || "",
+        y_symbol: m.ySymbol || "",
+        tick: m.tick || 0,
+        tick_val: m.tickVal || 0,
+        fee: m.fee || 0,
+        cur: m.cur || "USD",
+        margin_type: m.marginType || "FIXED",
+        init_margin: m.initMargin || 0,
+        maint_margin: m.maintMargin || 0,
+        multiplier: m.multiplier || 0,
+        description: m.desc || ""
+      };
+    });
+
+    if (masterRows.length > 0) {
+      const { error: insMasterError } = await supabaseClient
+        .from('asset_master')
+        .insert(masterRows);
+
+      if (insMasterError) throw insMasterError;
+    }
+
+    const { error: capitalsError } = await supabaseClient
+      .from('capitals')
+      .upsert({
+        user_id: user.id,
+        dom: capitals.dom || 0,
+        ovs: capitals.ovs || 0,
+        updated_at: new Date().toISOString()
+      });
+
+    if (capitalsError) throw capitalsError;
+
+    blotterMeta.lastExportedInputAt = blotterMeta.lastLocalInputAt;
+    saveMeta();
+
+    const { error: metaError } = await supabaseClient
+      .from('blotter_meta')
+      .upsert({
+        user_id: user.id,
+        last_local_input_at: blotterMeta.lastLocalInputAt || null,
+        last_imported_input_at: blotterMeta.lastImportedInputAt || null,
+        last_exported_input_at: blotterMeta.lastExportedInputAt || null,
+        updated_at: new Date().toISOString()
+      });
+
+    if (metaError) throw metaError;
+
+    updateSyncHeader();
+    alert("동기화 내보내기가 완료되었습니다.");
+  } catch (error) {
+    console.error(error);
+    alert("동기화 내보내기 실패: " + error.message);
+  }
+}
+
+async function importFromCloud() {
+  const user = await getCurrentUserOrAlert();
+  if (!user) return;
+
+  try {
+    // 1) trades 조회
+    const { data: tradeRows, error: tradeError } = await supabaseClient
+      .from('trades')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('date', { ascending: true });
+
+    if (tradeError) throw tradeError;
+
+    // 2) atm_records 조회
+    const { data: atmRows, error: atmError } = await supabaseClient
+      .from('atm_records')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('date', { ascending: false });
+
+    if (atmError) throw atmError;
+
+    // 3) asset_master 조회
+    const { data: masterRows, error: masterError } = await supabaseClient
+      .from('asset_master')
+      .select('*')
+      .eq('user_id', user.id);
+
+    if (masterError) throw masterError;
+
+    // 4) capitals 조회 (사용자당 1행)
+    const { data: capitalRow, error: capitalError } = await supabaseClient
+      .from('capitals')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (capitalError) throw capitalError;
+
+    // 5) blotter_meta 조회 (사용자당 1행)
+    const { data: metaRow, error: metaError } = await supabaseClient
+      .from('blotter_meta')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (metaError) throw metaError;
+
+    // 6) Supabase rows -> 앱 구조로 변환
+    const remoteTrades = (tradeRows || []).map(r => ({
+      id: r.trade_id || r.id,
+      date: r.date,
+      asset: r.asset,
+      maturity: r.maturity || "",
+      side: r.side,
+      price: Number(r.price),
+      qty: Number(r.qty),
+      fxRate: Number(r.fx_rate),
+      stopLoss: r.stop_loss != null ? Number(r.stop_loss) : null,
+      memo: r.memo || "",
+      createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
+      updatedAt: r.updated_at ? new Date(r.updated_at).getTime() : Date.now()
+    }));
+
+    const remoteATM = (atmRows || []).map(r => ({
+      id: r.record_id || r.id,
+      acc: r.acc,
+      date: r.date,
+      amt: Number(r.amt),
+      memo: r.memo || ""
+    }));
+
+    const remoteMaster = {};
+    (masterRows || []).forEach(r => {
+      remoteMaster[r.asset_code] = {
+        symbol: r.symbol || "",
+        ySymbol: r.y_symbol || "",
+        tick: Number(r.tick || 0),
+        tickVal: Number(r.tick_val || 0),
+        fee: Number(r.fee || 0),
+        cur: r.cur || "USD",
+        marginType: r.margin_type || "FIXED",
+        initMargin: Number(r.init_margin || 0),
+        maintMargin: Number(r.maint_margin || 0),
+        multiplier: Number(r.multiplier || 0),
+        desc: r.description || ""
+      };
+    });
+
+    // 7) 원격 데이터 존재 여부 체크
+    const hasTrades = remoteTrades.length > 0;
+    const hasATM = remoteATM.length > 0;
+    const hasMaster = Object.keys(remoteMaster).length > 0;
+    const hasCapitals = !!capitalRow;
+
+    if (!(hasTrades || hasATM || hasMaster || hasCapitals)) {
+      alert("동기화 데이터가 없습니다.");
+      return;
+    }
+
+    // 8) 덮어쓰기 확인
+    const msg = `동기화 데이터를 발견했습니다:
+- 매매: ${remoteTrades.length}건
+- 입출금: ${remoteATM.length}건
+- 상품설정: ${Object.keys(remoteMaster).length}건
+
+기존 데이터를 덮어쓰시겠습니까?`;
+
+    if (!confirm(msg)) return;
+
+    // 9) 현재 메모리 상태 교체
+    trades = remoteTrades;
+    atmRecords = remoteATM;
+
+    if (hasMaster) {
+      master = remoteMaster;
+    }
+
+    capitals = {
+      dom: Number(capitalRow?.dom || 0),
+      ovs: Number(capitalRow?.ovs || 0)
+    };
+
+    const syncedLocalInputAt = Number(metaRow?.last_local_input_at) || Date.now();
+    // IMPORT/EXPORT 시각은 원본 데이터가 가진 "로컬 입력 기준 시각"을 사용
+    blotterMeta.lastImportedInputAt = syncedLocalInputAt;
+    blotterMeta.lastLocalInputAt = syncedLocalInputAt;
+    blotterMeta.lastExportedInputAt = Number(metaRow?.last_exported_input_at) || null;
+
+    // 10) localStorage 캐시도 갱신
+    localStorage.setItem('blotter_trades_v96', JSON.stringify(trades));
+    localStorage.setItem('blotter_atm_v96', JSON.stringify(atmRecords));
+    localStorage.setItem('blotter_master_v96', JSON.stringify(master));
+    localStorage.setItem('blotter_capitals_v96', JSON.stringify(capitals));
+    localStorage.setItem('blotter_meta_v96', JSON.stringify(blotterMeta));
+
+    // 11) UI 반영
+    loadCapitals();
+    renderMaster();
+    initAssetSelect();
+    renderATM();
+    renderAll();
+    updateSyncHeader();
+
+    alert("동기화 가져오기가 완료되었습니다.");
+  } catch (error) {
+    console.error(error);
+    alert("동기화 가져오기 실패: " + error.message);
+  }
 }
 
 /**
@@ -449,7 +937,7 @@ async function syncMarketPrices() {
     }
 
     const now = new Date().toLocaleTimeString();
-    syncDisplay.innerText = updatedCount === assetKeys.length ? `전체 갱신 완료: ${now}` : `일부 갱신 (${updatedCount}/${assetKeys.length}): ${now}`;
+    syncDisplay.innerText = updatedCount === assetKeys.length ? `전체 갱신: ${now}` : `일부 갱신 (${updatedCount}/${assetKeys.length}): ${now}`;
     
     renderAll(); 
     runCalc();   
@@ -534,23 +1022,15 @@ function pnlPctForPosition(p){
  */
 function calculateEngine() {
 
-const positionStats = {}; 
-// key: asset_maturity
-// value: { netPnlKRW: number, isClosed: boolean }
-
   const sorted = [...trades].sort((a, b) => new Date(a.date) - new Date(b.date));
   const inventory = {}; 
 
   let rKRW_Total = 0, rKRW_Dom = 0, rUSD_Ovs = 0;
   let tFeeKRW = 0, feeKRW_Dom = 0, feeUSD_Ovs = 0;
-  let winSum = 0, lossSum = 0, winCount = 0, lossCount = 0;
 
   const processed = sorted.map((t, idx) => {
     const key = `${t.asset}_${t.maturity}`;
 
-if (!positionStats[key]) {
-  positionStats[key] = { netPnlKRW: 0, isClosed: false };
-}
     if (!inventory[key]) inventory[key] = [];
 
     const m = master[t.asset] || { tick: 1, tickVal: 0, fee: 0, cur: "KRW" };
@@ -561,6 +1041,7 @@ if (!positionStats[key]) {
 
     let remain = t.qty;
     let realizedThisTradeKRW = 0;
+    let realizedThisTradeCur = 0;
     let totalMatchValue = 0; // 수익률 계산용 매입원가 합계
 
     if (inventory[key].length > 0 && inventory[key][0].side !== t.side) {
@@ -571,8 +1052,10 @@ if (!positionStats[key]) {
         const diff = (t.side === "Sell") ? (t.price - matchingLot.price) : (matchingLot.price - t.price);
         const pnlPoint = (diff / m.tick) * m.tickVal * matchQty;
         const pnlKRW = (m.cur === "USD") ? pnlPoint * t.fxRate : pnlPoint;
+        const pnlCur = (m.cur === "USD") ? pnlPoint : pnlKRW;
 
         realizedThisTradeKRW += pnlKRW;
+        realizedThisTradeCur += pnlCur;
         totalMatchValue += (matchingLot.price * matchQty); // 원가 누적
         rKRW_Total += pnlKRW;
         
@@ -590,15 +1073,8 @@ if (!positionStats[key]) {
 
     const netQty = inventory[key].reduce((acc, lot) => acc + (lot.side === 'Buy' ? lot.qty : -lot.qty), 0);
 
-// ✅ 포지션 완전 종료(SQUARED) 판정
-if (netQty === 0) {
-  positionStats[key].isClosed = true;
-}
-
     const netPnlKRW = realizedThisTradeKRW - feeThisKRW;
-
-// ✅ 포지션 단위 누적 손익
-positionStats[key].netPnlKRW += netPnlKRW;
+    const netPnlCur = realizedThisTradeCur - feeThisCur;
 
     // --- 수정: 수익률(netPct) 계산 로직 추가 ---
     let netPct = 0;
@@ -614,14 +1090,14 @@ positionStats[key].netPnlKRW += netPnlKRW;
 netPct = (realizedThisTradeKRW / costKRW) * 100;
     }
 
-    // ✅ 승률/ PF는 "모든 체결"을 1회로 카운트 (OPEN도 포함)
-// - netPnlKRW = realized - fee
-// - OPEN이면 realized=0이라 보통 net<0(수수료) => 패배로 카운트
-
-// netPnlKRW === 0 은 무승부/무시(카운트 제외)
-
+    // 체결 성과 평가는 실현손익(수수료 제외) 기준으로 별도 집계합니다.
+	  
     return {
       ...t,
+      cur: m.cur || "KRW",
+      realizedPnlCur: realizedThisTradeCur,
+      feeCur: feeThisCur,
+      netPnlCur: netPnlCur,
       realizedPnlKRW: realizedThisTradeKRW,
       feeKRW: feeThisKRW,
       netPnlKRW: netPnlKRW,
@@ -662,29 +1138,24 @@ const moveDom = atmRecords.filter(r => r.acc === 'DOM').reduce((s, r) => s + saf
 const moveOvs = atmRecords.filter(r => r.acc === 'OVS').reduce((s, r) => s + safeNum(r.amt), 0);
 
 
-let posWin = 0, posLoss = 0, posWinSum = 0, posLossSum = 0;
-
-Object.values(positionStats).forEach(p => {
-  if (!p.isClosed) return; // 🔑 청산된 포지션만 평가
-
-  if (p.netPnlKRW > 0) {
-    posWin++;
-    posWinSum += p.netPnlKRW;
-  } else if (p.netPnlKRW < 0) {
-    posLoss++;
-    posLossSum += Math.abs(p.netPnlKRW);
-  }
-});
+const positionOutcome = calculatePositionOutcomes(processed);
+const tradeOutcome = calculateTradeOutcomes(processed);
 
 return {
   processed, openPos, netRealizedKRW: rKRW_Total - tFeeKRW,
-  posWin,
-  posLoss,
-  posWinSum,
-  posLossSum,
+  posWin: positionOutcome.win,
+  posLoss: positionOutcome.loss,
+  posWinSum: positionOutcome.winSum,
+  posLossSum: positionOutcome.lossSum,
+  posTotal: positionOutcome.total,
 
   rKRW_Dom, rUSD_Ovs, unrealizedKRW, feeKRW_Dom, feeUSD_Ovs,
-  winSum, lossSum, winCount, lossCount, totalTrades: winCount + lossCount,
+  tradeWin: tradeOutcome.win,
+  tradeLoss: tradeOutcome.loss,
+  tradeNeutral: tradeOutcome.neutral,
+  tradeWinSum: tradeOutcome.winSum,
+  tradeLossSum: tradeOutcome.lossSum,
+  tradeTotal: tradeOutcome.total,
   // 수정된 부분: 초기자본(capitals) + 입출금누계(move) + 매매손익
   eqDom: capitals.dom + moveDom + rKRW_Dom + uDom - feeKRW_Dom,
   eqOvs: capitals.ovs + moveOvs + rUSD_Ovs + uOvsPoint - feeUSD_Ovs
@@ -693,6 +1164,59 @@ return {
 
 
 
+
+
+function calculatePositionOutcomes(processedTrades) {
+  const cycleState = {};
+  const outcomes = [];
+
+  processedTrades.forEach(t => {
+    const key = `${t.asset}_${t.maturity}`;
+    if (!cycleState[key]) cycleState[key] = { current: null };
+
+    if (!cycleState[key].current) {
+      cycleState[key].current = { netPnlKRW: 0, hasOpen: false, hasClose: false };
+    }
+
+    const cycle = cycleState[key].current;
+    cycle.netPnlKRW += t.netPnlKRW;
+
+    if (t.isCloseTrade) cycle.hasClose = true;
+    else cycle.hasOpen = true;
+
+    if (t.currentNetQty === 0) {
+      if (cycle.hasOpen && cycle.hasClose) outcomes.push(cycle);
+      cycleState[key].current = null;
+    }
+  });
+
+  let win = 0, loss = 0, winSum = 0, lossSum = 0;
+  outcomes.forEach(o => {
+    if (o.netPnlKRW > 0) { win++; winSum += o.netPnlKRW; }
+    else if (o.netPnlKRW < 0) { loss++; lossSum += Math.abs(o.netPnlKRW); }
+  });
+
+  return { win, loss, winSum, lossSum, total: outcomes.length };
+}
+
+function calculateTradeOutcomes(processedTrades) {
+  let win = 0, loss = 0, neutral = 0;
+  let winSum = 0, lossSum = 0;
+
+  processedTrades.forEach(t => {
+    if (t.realizedPnlKRW > 0) {
+      win++;
+      winSum += t.realizedPnlKRW;
+    } else if (t.realizedPnlKRW < 0) {
+      loss++;
+      lossSum += Math.abs(t.realizedPnlKRW);
+    } else {
+      neutral++;
+    }
+  });
+
+  return { win, loss, neutral, winSum, lossSum, total: processedTrades.length };
+}
 
 
 function calculateStopRiskSummary(res) {
@@ -793,24 +1317,11 @@ function renderAll() {
 
   // ---------------------------------------------------------
   // 1. 체결(Trade) 기준 성과 지표 계산
-  // 모든 매매 건별(Open/Close 포함) 손익을 기반으로 승률과 PF를 산출합니다.
+  // 전체 거래 단위를 대상으로 하되, 승/패 분류는 실현손익(수수료 제외) 기준으로 계산합니다.
   // ---------------------------------------------------------
-  let tradeWin = 0, tradeLoss = 0;
-  let tradeWinSum = 0, tradeLossSum = 0;
-
-  res.processed.forEach(t => {
-    if (t.netPnlKRW > 0) {
-      tradeWin++;
-      tradeWinSum += t.netPnlKRW;
-    } else if (t.netPnlKRW < 0) {
-      tradeLoss++;
-      tradeLossSum += Math.abs(t.netPnlKRW);
-    }
-  });
-
-  const tradeTotal = tradeWin + tradeLoss;
-  const tradeWinRate = tradeTotal > 0 ? ((tradeWin / tradeTotal) * 100).toFixed(1) : "0.0";
-  const tradePF = tradeLossSum > 0 ? (tradeWinSum / tradeLossSum).toFixed(2) : (tradeWinSum > 0 ? "∞" : "0.00");
+  const tradeTotal = res.tradeTotal;
+  const tradeWinRate = tradeTotal > 0 ? ((res.tradeWin / tradeTotal) * 100).toFixed(1) : "0.0";
+  const tradePF = res.tradeLossSum > 0 ? (res.tradeWinSum / res.tradeLossSum).toFixed(2) : (res.tradeWinSum > 0 ? "∞" : "0.00");
 
   // ---------------------------------------------------------
   // 2. 우측 사이드바: 계좌 자산 및 리스크 지표 업데이트
@@ -840,9 +1351,19 @@ function renderAll() {
   // ---------------------------------------------------------
   // 3. 중앙 대시보드: 실현 손익 상단 카드 업데이트
   // ---------------------------------------------------------
-  document.getElementById('total-realized-krw').innerText = Math.round(res.netRealizedKRW).toLocaleString();
-  const realizedPct = capitals.dom ? (res.netRealizedKRW / capitals.dom) * 100 : 0;
-  document.getElementById('total-realized-pct').innerText = realizedPct.toFixed(1) + "%";
+  const netRealizedKRWDom = res.rKRW_Dom - res.feeKRW_Dom;
+  const netRealizedUSD = res.rUSD_Ovs - res.feeUSD_Ovs;
+  const netRealizedKRWTotal = netRealizedKRWDom + (netRealizedUSD * globalFX);
+
+  document.getElementById("total-realized-krw").innerText = Math.round(netRealizedKRWTotal).toLocaleString();
+  const capitalTotalKRW = capitals.dom + (capitals.ovs * globalFX);
+  const realizedPct = capitalTotalKRW ? (netRealizedKRWTotal / capitalTotalKRW) * 100 : 0;
+  document.getElementById("total-realized-pct").innerText = realizedPct.toFixed(1) + "%";
+
+  const realizedBreakdownEl = document.getElementById("total-realized-breakdown");
+  if (realizedBreakdownEl) {
+    realizedBreakdownEl.innerText = "₩" + Math.round(netRealizedKRWDom).toLocaleString() + " / $" + netRealizedUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
 
   // ---------------------------------------------------------
   // 4. 미실현(평가) 손익률 및 가중치 계산
@@ -920,16 +1441,17 @@ function renderAll() {
     <div>
       <span style="color:var(--muted)">체결 승률 / PF</span><br>
       <b style="font-size:12px;">${tradeTotal}회 / ${tradeWinRate}%</b><br>
+      <span style="font-size:10px; color:var(--muted);">승 ${res.tradeWin} / 패 ${res.tradeLoss} / 중립 ${res.tradeNeutral}</span><br>
       <span style="font-size:11px; color:var(--accent);">PF ${tradePF}</span>
     </div>
 
     <!-- [세 번째 칸] 포지션 기준 성과 -->
     <div>
       <span style="color:var(--muted)">포지션 승률 / PF</span><br>
-      <b style="font-size:12px;">${res.posWin + res.posLoss}회 /
+      <b style="font-size:12px;">${res.posTotal}회 /
       ${
-        res.posWin + res.posLoss > 0
-          ? ((res.posWin / (res.posWin + res.posLoss)) * 100).toFixed(1)
+        res.posTotal > 0
+          ? ((res.posWin / res.posTotal) * 100).toFixed(1)
           : "0.0"
       }%</b><br>
       <span style="font-size:11px; color:var(--accent);">PF ${
@@ -1054,7 +1576,13 @@ let statusLabel = `
         <td>${t.qty}</td>
         <td>${statusLabel}</td>
         <td>${t.stopLoss ?? '-'}</td>
-        <td class="${t.netPnlKRW >= 0 ? 'up' : 'down'}">${t.netPnlKRW !== 0 ? Math.round(t.netPnlKRW).toLocaleString() : '-'}</td>
+        <td class="${t.netPnlCur >= 0 ? 'up' : 'down'}">${
+          t.netPnlCur !== 0
+            ? (t.cur === "USD"
+                ? "$" + t.netPnlCur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                : Math.round(t.netPnlCur).toLocaleString())
+            : '-'
+        }</td>
         <td class="${t.netPct >= 0 ? 'up' : 'down'}">${t.netPct !== 0 ? t.netPct.toFixed(2) + '%' : '-'}</td>
         <td>
           <button onclick="editTrade(${t.id})" class="btn-edit">수정</button>
@@ -1234,6 +1762,7 @@ function renderMaster() {
       </div>`;
     calcSelect.innerHTML += `<option value="${k}">${k}</option>`;
   });
+  initReportAssetFilter();
 }
 
 /**
@@ -1420,6 +1949,21 @@ function initAssetSelect() {
   s.innerHTML = "";
   Object.keys(master).forEach(k => s.innerHTML += `<option value="${k}">${k}</option>`);
   if (!s.value) s.value = Object.keys(master)[0] || "";
+  initReportAssetFilter();
+}
+
+function initReportAssetFilter(sourceTrades = trades) {
+  const reportSelect = document.getElementById("repAssetFilter");
+  if (!reportSelect) return;
+
+  const prev = reportSelect.value || "ALL";
+  const idsFromMaster = Object.keys(master || {});
+  const idsFromTrades = Array.from(new Set((sourceTrades || []).map(t => t.asset).filter(Boolean)));
+  const assetIds = Array.from(new Set([...idsFromMaster, ...idsFromTrades])).sort();
+
+  reportSelect.innerHTML = `<option value="ALL">전체 상품</option>`;
+  assetIds.forEach(k => reportSelect.innerHTML += `<option value="${k}">${k}</option>`);
+  reportSelect.value = assetIds.includes(prev) ? prev : "ALL";
 }
 // 전역 변수에 위젯 저장 객체 추가
 let tvWidget = null;
@@ -1568,24 +2112,41 @@ function updateAvailContractsOnPrice(){ // on price input
  * Boot
  * =========================
  */
-window.onload = () => {
+window.onload = async () => {
   initAssetSelect();
   renderMaster();
   loadCapitals();
 
   document.getElementById('tradeDate').value = new Date().toISOString().split('T')[0];
-  if(!document.getElementById('maturityDate').value){
+
+  if (!document.getElementById('maturityDate').value) {
     document.getElementById('maturityDate').value = new Date().toISOString().split('T')[0];
   }
+
   syncDTEFromMaturity();
 
-
-
-  renderATM(); // 추가
+  renderATM();
   onAssetChange();
   renderAll();
   syncMarketPrices();
-updateSyncHeader();
+  updateSyncHeader();
+
+  await updateSyncAuthUI();
+
+  const { data, error } = await supabaseClient.auth.getSession();
+  if (error) {
+    console.error("Supabase session restore failed:", error.message);
+  } else if (data?.session) {
+    const allowed = await isAllowedEmail(data.session.user?.email);
+
+    if (!allowed) {
+      await supabaseClient.auth.signOut();
+      await updateSyncAuthUI();
+      alert("허용되지 않은 계정입니다. 관리자의 허용이 필요합니다.");
+    } else {
+      console.log("Supabase session restored:", data.session.user?.email || data.session.user?.id);
+    }
+  }
 };
 
 
@@ -1594,53 +2155,50 @@ updateSyncHeader();
  * 리포트 및 세팅용 추가 함수
  */
 
-// 1. 퍼포먼스 리포트 렌더링
 function renderPerformanceReport() {
   const start = document.getElementById('repStartDate').value;
   const end = document.getElementById('repEndDate').value;
-
   const res = calculateEngine();
   const processed = res.processed;
+  initReportAssetFilter(processed);
+  const assetFilter = document.getElementById("repAssetFilter")?.value || "ALL";
   // 선택한 기간에 해당하는 거래만 필터링
-  const filtered = processed.filter(t => (!start || t.date >= start) && (!end || t.date <= end));
+  const filtered = processed.filter(t => (!start || t.date >= start) && (!end || t.date <= end) && (assetFilter === "ALL" || t.asset === assetFilter));
 
   // --- [데이터 집계 변수] ---
-  let totalRealized = 0;
-  let totalFee = 0;
+  let realizedKRW = 0, realizedUSD = 0;
+  let feeKRW = 0, feeUSD = 0;
 
   // 체결(Trade) 기준 변수
   let tWin = 0, tLoss = 0;
   let tWinSum = 0, tLossSum = 0;
 
-  // 포지션(Position) 기준 변수 (기간 내 청산된 포지션 대상)
-  const periodPositionStats = {};
+
 
   const body = document.querySelector('#repDetailTable tbody');
   body.innerHTML = '';
 
   filtered.forEach(t => {
     // 1. 기본 손익/수수료 누적
-    totalRealized += t.realizedPnlKRW;
-    totalFee += t.feeKRW;
+    if (t.cur === "USD") {
+      realizedUSD += t.realizedPnlCur;
+      feeUSD += t.feeCur;
+    } else {
+      realizedKRW += t.realizedPnlCur;
+      feeKRW += t.feeCur;
+    }
 
-    // 2. 체결 기준 집계 (건별)
-    if (t.netPnlKRW > 0) {
+    // 2. 체결 기준 집계 (전체 거래 단위)
+    // 수수료로만 마이너스인 경우(실현손익 0)는 패배로 보지 않고 중립 처리
+    if (t.realizedPnlKRW > 0) {
       tWin++;
-      tWinSum += t.netPnlKRW;
-    } else if (t.netPnlKRW < 0) {
+      tWinSum += t.realizedPnlKRW;
+    } else if (t.realizedPnlKRW < 0) {
       tLoss++;
-      tLossSum += Math.abs(t.netPnlKRW);
+      tLossSum += Math.abs(t.realizedPnlKRW);
     }
 
-    // 3. 포지션 기준 집계를 위한 그룹화
-    const key = `${t.asset}_${t.maturity}`;
-    if (!periodPositionStats[key]) {
-      periodPositionStats[key] = { netPnlKRW: 0, isClosed: false };
-    }
-    periodPositionStats[key].netPnlKRW += t.netPnlKRW;
-    if (t.currentNetQty === 0) periodPositionStats[key].isClosed = true;
-
-    // 4. 테이블 행 추가
+    // 3. 테이블 행 추가
     let statusLabel = t.currentNetQty === 0 ? 'SQUARED' : (t.isCloseTrade ? 'CLOSE' : 'OPEN');
     body.innerHTML += `
       <tr>
@@ -1650,9 +2208,9 @@ function renderPerformanceReport() {
         <td>${t.price.toLocaleString()}</td>
         <td>${t.qty}</td>
         <td><span class="pill">${statusLabel}</span></td>
-        <td>${Math.round(t.realizedPnlKRW).toLocaleString()}</td>
-        <td style="color:var(--bad)">${Math.round(t.feeKRW).toLocaleString()}</td>
-        <td><b>${Math.round(t.netPnlKRW).toLocaleString()}</b></td>
+        <td>${t.cur === "USD" ? "$" + t.realizedPnlCur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(t.realizedPnlCur).toLocaleString()}</td>
+        <td style="color:var(--bad)">${t.cur === "USD" ? "$" + t.feeCur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(t.feeCur).toLocaleString()}</td>
+        <td><b>${t.cur === "USD" ? "$" + t.netPnlCur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(t.netPnlCur).toLocaleString()}</b></td>
         <td class="${t.netPct >= 0 ? 'up' : 'down'}">${t.netPct.toFixed(2)}%</td>
         <td class="mono" style="font-size:10px; opacity:0.7;">${t.memo || '-'}</td>
       </tr>`;
@@ -1661,25 +2219,37 @@ function renderPerformanceReport() {
   // --- [최종 성과 지표 계산] ---
   
   // 체결 기준 승률/PF
-  const tTotal = tWin + tLoss;
+  const tTotal = filtered.length;
   const tWinRate = tTotal > 0 ? ((tWin / tTotal) * 100).toFixed(1) : "0.0";
   const tPF = tLossSum > 0 ? (tWinSum / tLossSum).toFixed(2) : (tWinSum > 0 ? "∞" : "0.00");
 
-  // 포지션 기준 승률/PF (청산 완료된 포지션만)
-  let pWin = 0, pLoss = 0, pWinSum = 0, pLossSum = 0;
-  Object.values(periodPositionStats).forEach(p => {
-    if (!p.isClosed) return; 
-    if (p.netPnlKRW > 0) { pWin++; pWinSum += p.netPnlKRW; }
-    else if (p.netPnlKRW < 0) { pLoss++; pLossSum += Math.abs(p.netPnlKRW); }
-  });
-  const pTotal = pWin + pLoss;
+  // 포지션 기준 승률/PF (사이클 단위)
+  const periodPos = calculatePositionOutcomes(filtered);
+  const pWin = periodPos.win;
+  const pLoss = periodPos.loss;
+  const pWinSum = periodPos.winSum;
+  const pLossSum = periodPos.lossSum;
+  const pTotal = periodPos.total;
   const pWinRate = pTotal > 0 ? ((pWin / pTotal) * 100).toFixed(1) : "0.0";
   const pPF = pLossSum > 0 ? (pWinSum / pLossSum).toFixed(2) : (pWinSum > 0 ? "∞" : "0.00");
 
   // --- [UI 업데이트] ---
-  document.getElementById('rep-realized').innerText = Math.round(totalRealized).toLocaleString();
-  document.getElementById('rep-fee').innerText = "-" + Math.round(totalFee).toLocaleString();
-  document.getElementById('rep-net').innerText = Math.round(totalRealized - totalFee).toLocaleString();
+  const realizedKRWTotal = realizedKRW + (realizedUSD * globalFX);
+  const feeKRWTotal = feeKRW + (feeUSD * globalFX);
+  const netKRWTotal = realizedKRWTotal - feeKRWTotal;
+
+  document.getElementById('rep-realized').innerText = Math.round(realizedKRWTotal).toLocaleString();
+  document.getElementById('rep-fee').innerText = "-" + Math.round(feeKRWTotal).toLocaleString();
+  document.getElementById('rep-net').innerText = Math.round(netKRWTotal).toLocaleString();
+
+  const netKRW = realizedKRW - feeKRW;
+  const netUSD = realizedUSD - feeUSD;
+  const repRealizedBreakdown = document.getElementById('rep-realized-breakdown');
+  if (repRealizedBreakdown) repRealizedBreakdown.innerText = "₩" + Math.round(realizedKRW).toLocaleString() + " / $" + realizedUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const repFeeBreakdown = document.getElementById('rep-fee-breakdown');
+  if (repFeeBreakdown) repFeeBreakdown.innerText = "₩" + Math.round(feeKRW).toLocaleString() + " / $" + feeUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const repNetBreakdown = document.getElementById('rep-net-breakdown');
+  if (repNetBreakdown) repNetBreakdown.innerText = "₩" + Math.round(netKRW).toLocaleString() + " / $" + netUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   
   // 승률 표시 (체결 / 포지션)
   document.getElementById('rep-winrate').innerHTML = 
