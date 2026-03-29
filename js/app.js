@@ -94,8 +94,13 @@ function bindAuthAutoActions() {
     }
 
     if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-      await runAutoCloudActionsForUser(session?.user || null, `auth-${event}`);
+      // 로그인 상태 표시는 즉시 갱신하고, import/export 자동 처리는 백그라운드로 실행
       await updateSyncAuthUI();
+      runAutoCloudActionsForUser(session?.user || null, `auth-${event}`)
+        .catch((err) => console.error('auto cloud actions failed:', err))
+        .finally(() => {
+          updateSyncAuthUI();
+        });
     }
   });
 }
@@ -2374,12 +2379,22 @@ window.onload = async () => {
   initAutoSyncUI();
   bindAuthAutoActions();
 
-  await runAutoCloudActionsFromSession('boot');
+  // 로그인 표시를 먼저 반영
   await updateSyncAuthUI();
 
-  setTimeout(async () => {
-    await runAutoCloudActionsFromSession('boot-delayed');
-    await updateSyncAuthUI();
+  // 자동 import/export는 백그라운드로 실행
+  runAutoCloudActionsFromSession('boot')
+    .catch((err) => console.error('boot auto actions failed:', err))
+    .finally(() => {
+      updateSyncAuthUI();
+    });
+
+  setTimeout(() => {
+    runAutoCloudActionsFromSession('boot-delayed')
+      .catch((err) => console.error('boot-delayed auto actions failed:', err))
+      .finally(() => {
+        updateSyncAuthUI();
+      });
   }, 1500);
 };
 
