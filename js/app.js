@@ -11,6 +11,159 @@ function saveMeta() {
   localStorage.setItem('blotter_meta_v96', JSON.stringify(blotterMeta));
 }
 
+const AUTO_SYNC_STORAGE_KEY = 'blotter_autosync_enabled_v1';
+const AUTO_SYNC_DEBOUNCE_MS = 4000;
+
+let autoSyncEnabled = localStorage.getItem(AUTO_SYNC_STORAGE_KEY) !== '0';
+let autoSyncTimer = null;
+let autoSyncInFlight = false;
+let autoSyncLastAttemptLocalAt = null;
+
+function setAutoSyncStatus(text, className = '') {
+  const statusEl = document.getElementById('autosync-status');
+  if (!statusEl) return;
+
+  statusEl.innerText = text;
+  statusEl.classList.remove('sync-ok', 'sync-warn', 'sync-danger');
+  if (className) statusEl.classList.add(className);
+}
+
+function initAutoSyncUI() {
+  const toggleEl = document.getElementById('autosync-toggle');
+  if (toggleEl) {
+    toggleEl.checked = autoSyncEnabled;
+  }
+
+  if (!autoSyncEnabled) {
+    setAutoSyncStatus('OFF');
+    return;
+  }
+
+  setAutoSyncStatus('ON', 'sync-ok');
+  maybeScheduleAutoSync();
+}
+
+function toggleAutoSync(event) {
+  autoSyncEnabled = !!event?.target?.checked;
+  localStorage.setItem(AUTO_SYNC_STORAGE_KEY, autoSyncEnabled ? '1' : '0');
+
+  if (!autoSyncEnabled) {
+    if (autoSyncTimer) {
+      clearTimeout(autoSyncTimer);
+      autoSyncTimer = null;
+    }
+    autoSyncInFlight = false;
+    setAutoSyncStatus('OFF');
+    return;
+  }
+
+  setAutoSyncStatus('ON', 'sync-ok');
+  maybeScheduleAutoSync();
+}
+
+function maybeScheduleAutoSync(statusOverride = null) {
+  if (!autoSyncEnabled || autoSyncInFlight) return;
+
+  const status = statusOverride || getSyncStatus(
+    blotterMeta.lastLocalInputAt,
+    blotterMeta.lastImportedInputAt,
+    blotterMeta.lastExportedInputAt
+  );
+
+  if (status === 'OK') {
+    setAutoSyncStatus('SYNCED', 'sync-ok');
+    return;
+  }
+
+  if (status === 'DANGER') {
+    setAutoSyncStatus('CHECK', 'sync-danger');
+    return;
+  }
+
+  if (status !== 'WARN') {
+    setAutoSyncStatus('IDLE');
+    return;
+  }
+
+  const localAt = Number(blotterMeta.lastLocalInputAt) || null;
+  if (!localAt) return;
+
+  if (Number(blotterMeta.lastExportedInputAt) === localAt) {
+    setAutoSyncStatus('SYNCED', 'sync-ok');
+    return;
+  }
+
+  if (autoSyncLastAttemptLocalAt === localAt) {
+    setAutoSyncStatus('WAIT', 'sync-warn');
+    return;
+  }
+
+  setAutoSyncStatus('PENDING', 'sync-warn');
+
+  if (autoSyncTimer) {
+    clearTimeout(autoSyncTimer);
+  }
+
+  autoSyncTimer = setTimeout(() => {
+    autoSyncTimer = null;
+    runAutoSyncIfNeeded();
+  }, AUTO_SYNC_DEBOUNCE_MS);
+}
+
+async function getCurrentUserSilently() {
+  const { data, error } = await supabaseClient.auth.getSession();
+  if (error) return null;
+
+  const user = data?.session?.user;
+  if (!user) return null;
+
+  const allowed = await isAllowedEmail(user.email);
+  if (!allowed) return null;
+
+  return user;
+}
+
+async function runAutoSyncIfNeeded() {
+  if (!autoSyncEnabled || autoSyncInFlight) return;
+
+  const status = getSyncStatus(
+    blotterMeta.lastLocalInputAt,
+    blotterMeta.lastImportedInputAt,
+    blotterMeta.lastExportedInputAt
+  );
+
+  if (status !== 'WARN') return;
+
+  const localAt = Number(blotterMeta.lastLocalInputAt) || null;
+  if (!localAt) return;
+  if (Number(blotterMeta.lastExportedInputAt) === localAt) return;
+
+  autoSyncInFlight = true;
+  setAutoSyncStatus('SYNCING', 'sync-warn');
+
+  try {
+    const user = await getCurrentUserSilently();
+    if (!user) {
+      setAutoSyncStatus('LOGIN', 'sync-warn');
+      return;
+    }
+
+    const ok = await exportToCloudInternal({ user, skipConfirm: true, silent: true, source: 'autosync' });
+
+    if (ok) {
+      autoSyncLastAttemptLocalAt = localAt;
+      setAutoSyncStatus('SYNCED', 'sync-ok');
+    } else {
+      setAutoSyncStatus('RETRY', 'sync-danger');
+    }
+  } catch (error) {
+    console.error('autosync failed:', error);
+    setAutoSyncStatus('RETRY', 'sync-danger');
+  } finally {
+    autoSyncInFlight = false;
+  }
+}
+
 function fmtTime(ts) {
   if (!ts) return "-";
   const d = new Date(Number(ts));
@@ -189,6 +342,10 @@ async function updateSyncAuthUI() {
     statusEl.classList.add('sync-auth-off');
 
     if (btnEl) btnEl.innerText = '동기화 로그인';
+  }
+
+  if (autoSyncEnabled) {
+    maybeScheduleAutoSync();
   }
 }
 
@@ -534,31 +691,33 @@ function toSafeIntegerId(value) {
   return Date.now();
 }
 
-async function exportToCloud() {
-  const user = await getCurrentUserOrAlert();
-  if (!user) return;
+async function exportToCloudInternal({ user = null, skipConfirm = false, silent = false, source = 'manual' } = {}) {
+  const currentUser = user || await getCurrentUserOrAlert();
+  if (!currentUser) return false;
 
-  const exportSummaryMsg = `현재 데이터를 원격 동기화 데이터로 저장합니다:
+  if (!skipConfirm) {
+    const exportSummaryMsg = `현재 데이터를 원격 동기화 데이터로 저장합니다:
 - 매매: ${trades.length}건
 - 입출금: ${atmRecords.length}건
 - 상품설정: ${Object.keys(master).length}건
 
 기존 원격 데이터는 덮어써질 수 있습니다.
 계속하시겠습니까?`;
-  const confirmed = confirm(exportSummaryMsg);
-  if (!confirmed) return;
+    const confirmed = confirm(exportSummaryMsg);
+    if (!confirmed) return false;
+  }
 
   try {
     const { error: delTradesError } = await supabaseClient
       .from('trades')
       .delete()
-      .eq('user_id', user.id);
+      .eq('user_id', currentUser.id);
 
     if (delTradesError) throw delTradesError;
 
     if (trades.length > 0) {
       const tradeRows = trades.map(t => ({
-        user_id: user.id,
+        user_id: currentUser.id,
         trade_id: toSafeIntegerId(t.id),
         date: t.date,
         asset: t.asset,
@@ -583,13 +742,13 @@ async function exportToCloud() {
     const { error: delAtmError } = await supabaseClient
       .from('atm_records')
       .delete()
-      .eq('user_id', user.id);
+      .eq('user_id', currentUser.id);
 
     if (delAtmError) throw delAtmError;
 
     if (atmRecords.length > 0) {
       const atmRows = atmRecords.map(r => ({
-        user_id: user.id,
+        user_id: currentUser.id,
         record_id: toSafeIntegerId(r.id),
         acc: r.acc,
         date: r.date,
@@ -607,14 +766,14 @@ async function exportToCloud() {
     const { error: delMasterError } = await supabaseClient
       .from('asset_master')
       .delete()
-      .eq('user_id', user.id);
+      .eq('user_id', currentUser.id);
 
     if (delMasterError) throw delMasterError;
 
     const masterRows = Object.keys(master).map(assetCode => {
       const m = master[assetCode];
       return {
-        user_id: user.id,
+        user_id: currentUser.id,
         asset_code: assetCode,
         symbol: m.symbol || "",
         y_symbol: m.ySymbol || "",
@@ -641,7 +800,7 @@ async function exportToCloud() {
     const { error: capitalsError } = await supabaseClient
       .from('capitals')
       .upsert({
-        user_id: user.id,
+        user_id: currentUser.id,
         dom: capitals.dom || 0,
         ovs: capitals.ovs || 0,
         updated_at: new Date().toISOString()
@@ -655,7 +814,7 @@ async function exportToCloud() {
     const { error: metaError } = await supabaseClient
       .from('blotter_meta')
       .upsert({
-        user_id: user.id,
+        user_id: currentUser.id,
         last_local_input_at: blotterMeta.lastLocalInputAt || null,
         last_imported_input_at: blotterMeta.lastImportedInputAt || null,
         last_exported_input_at: blotterMeta.lastExportedInputAt || null,
@@ -665,11 +824,27 @@ async function exportToCloud() {
     if (metaError) throw metaError;
 
     updateSyncHeader();
-    alert("동기화 내보내기가 완료되었습니다.");
+
+    if (!silent) {
+      alert("동기화 내보내기가 완료되었습니다.");
+    }
+
+    return true;
   } catch (error) {
     console.error(error);
-    alert("동기화 내보내기 실패: " + error.message);
+
+    if (!silent) {
+      alert("동기화 내보내기 실패: " + error.message);
+    } else if (source === 'autosync') {
+      console.warn("autosync export failed:", error.message);
+    }
+
+    return false;
   }
+}
+
+async function exportToCloud() {
+  await exportToCloudInternal();
 }
 
 async function importFromCloud() {
@@ -2130,6 +2305,7 @@ window.onload = async () => {
   renderAll();
   syncMarketPrices();
   updateSyncHeader();
+  initAutoSyncUI();
 
   await updateSyncAuthUI();
 
@@ -2318,6 +2494,8 @@ function updateSyncHeader() {
   const importEl = document.getElementById('sync-import');
   const exportEl = document.getElementById('sync-export');
 
+  if (!localEl || !importEl || !exportEl) return;
+
   const local = blotterMeta.lastLocalInputAt;
   const imp   = blotterMeta.lastImportedInputAt;
   const exp   = blotterMeta.lastExportedInputAt;
@@ -2334,24 +2512,30 @@ function updateSyncHeader() {
 
   const status = getSyncStatus(local, imp, exp);
 
-if (status === 'OK') {
-  localEl.classList.add('sync-ok');
-  importEl.classList.add('sync-ok');
-  exportEl.classList.add('sync-ok');
-}
+  if (status === 'OK') {
+    localEl.classList.add('sync-ok');
+    importEl.classList.add('sync-ok');
+    exportEl.classList.add('sync-ok');
+  }
 
-if (status === 'WARN') {
-  localEl.classList.add('sync-warn');
-  importEl.classList.add('sync-warn');
-  exportEl.classList.add('sync-warn');
-}
+  if (status === 'WARN') {
+    localEl.classList.add('sync-warn');
+    importEl.classList.add('sync-warn');
+    exportEl.classList.add('sync-warn');
+  }
 
-if (status === 'DANGER') {
-  importEl.classList.add('sync-danger');
-  localEl.classList.add('sync-warn');
-  exportEl.classList.add('sync-warn');
-}
+  if (status === 'DANGER') {
+    importEl.classList.add('sync-danger');
+    localEl.classList.add('sync-warn');
+    exportEl.classList.add('sync-warn');
+  }
 
+  if (!autoSyncEnabled) {
+    setAutoSyncStatus('OFF');
+    return;
+  }
+
+  maybeScheduleAutoSync(status);
 
   // INIT: 아무것도 없으면 굳이 색칠 안 함(원하면 warn 처리 가능)
 }

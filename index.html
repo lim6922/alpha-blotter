@@ -25,6 +25,13 @@
         <div><b>LOCAL INPUT</b><br><span id="sync-local">-</span></div>
         <div><b>IMPORT</b><br><span id="sync-import">-</span></div>
         <div><b>EXPORT</b><br><span id="sync-export">-</span></div>
+        <div>
+          <b>AUTO SYNC</b><br>
+          <label class="autosync-toggle">
+            <input type="checkbox" id="autosync-toggle" onchange="toggleAutoSync(event)" />
+            <span id="autosync-status">OFF</span>
+          </label>
+        </div>
       </div>
 
       <!-- 실시간 시세 상태 표시줄 -->
