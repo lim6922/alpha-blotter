@@ -21,7 +21,7 @@
     
     <!-- 동기화 정보: 로컬 데이터와 백업용 CSV 간의 시간차를 모니터링 -->
     <div id="fx-container">
-      <div id="sync-bar" style="display:flex; gap:24px; background:rgba(255,255,255,0.06); padding:6px 14px; border-radius:12px; font-size:11px; margin-left:20px;">
+      <div id="sync-bar" style="display:flex; gap:16px; background:rgba(255,255,255,0.06); padding:8px 14px; border-radius:12px; font-size:11px; margin-left:0;">
         <div><b>LOCAL INPUT</b><br><span id="sync-local">-</span></div>
         <div><b>IMPORT</b><br><span id="sync-import">-</span></div>
         <div><b>EXPORT</b><br><span id="sync-export">-</span></div>
@@ -36,14 +36,20 @@
   </div>
 
   <!-- 글로벌 액션 버튼 모음 -->
-  <div style="display:flex; gap:10px;">
-    <button class="btn-outline" id="stealthBtn" onclick="toggleStealthMode()">👁️ 차트 숨기기</button>
-    <div style="height:20px; width:1px; background:var(--line); margin:0 5px;"></div>
+<div class="header-actions">
+  <div class="header-actions-row">
     <input type="file" id="csvImport" style="display:none;" onchange="importFromCSV(event)" />
-    <button class="btn-outline" onclick="document.getElementById('csvImport').click()">가져오기</button>
-    <button class="btn-outline" onclick="exportToCSV()">내보내기</button>
+    <span id="sync-auth-status" class="sync-auth-status sync-auth-off">로그인 필요</span>
+    <button class="btn-outline btn-sync" id="syncAuthBtn" onclick="handleSyncAuth()">동기화 로그인</button>
+    <button class="btn-outline btn-sync" onclick="importFromCloud()">동기화 가져오기</button>
+    <button class="btn-outline btn-sync" onclick="exportToCloud()">동기화 내보내기</button>
+    <button class="btn-outline" onclick="document.getElementById('csvImport').click()">CSV 가져오기</button>
+    <button class="btn-outline" onclick="exportToCSV()">CSV 내보내기</button>
     <button class="btn-danger" onclick="clearAllData()">전체삭제</button>
+    <button class="btn-outline" id="stealthBtn" onclick="toggleStealthMode()">👁️ 차트 숨기기</button>
   </div>
+</div>
+  
 </header>
 <!-- // [END OF HEADER] -->
 
@@ -135,9 +141,10 @@
         <h2>요약 (가시성 강화)</h2>
         <div class="stat-row">
           <div class="stat-card">
-            <div class="stat-label">실현 순손익 (KRW)</div>
+            <div class="stat-label">실현 순손익 (KRW 합산)</div>
             <div id="total-realized-krw" class="stat-val mono big-val">0</div>
             <div style="font-size:10px; color:var(--muted)">손익률: <b id="total-realized-pct">0.0%</b></div>
+            <div style="font-size:10px; color:var(--muted)">KRW / USD: <b id="total-realized-breakdown">₩0 / $0.00</b></div>
           </div>
           <div class="stat-card">
             <div class="stat-label">미실현 평가손익 (KRW)</div>
@@ -176,7 +183,7 @@
             <thead>
               <tr>
                 <th>일자</th><th>상품</th><th>구분</th><th>가격</th><th>수량</th><th>상태</th>
-                <th>스탑</th><th>순손익</th><th>손익률</th><th>액션</th><th>메모</th>
+                <th>스탑</th><th>순손익(통화)</th><th>손익률</th><th>액션</th><th>메모</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -305,16 +312,17 @@
       <div class="report-filter">
         <div class="filter-item"><label>조회 시작일</label><input type="date" id="repStartDate"></div>
         <div class="filter-item"><label>조회 종료일</label><input type="date" id="repEndDate"></div>
+        <div class="filter-item"><label>상품</label><select id="repAssetFilter" onchange="renderPerformanceReport()"><option value="ALL">전체 상품</option></select></div>
         <button class="btn-blue" onclick="renderPerformanceReport()" style="padding: 8px 30px; width: auto;">조회하기</button>
       </div>
 
 <div class="summary-grid">
   <!-- 1. 기간 실현손익 (수수료 차감 전) -->
-  <div class="stat-card">    <div class="stat-label">기간 실현손익 (Gross)</div>    <div id="rep-realized" class="stat-val mono">0</div>  </div>
+  <div class="stat-card">    <div class="stat-label">기간 실현손익 (Gross, KRW 합산)</div>    <div id="rep-realized" class="stat-val mono">0</div>    <div style="font-size:10px; color:var(--muted)">KRW / USD: <b id="rep-realized-breakdown">₩0 / $0.00</b></div>  </div>
   <!-- 2. 기간 총 수수료 (빨간색 강조) -->
-  <div class="stat-card">    <div class="stat-label">기간 수수료 (Total Fee)</div>    <div id="rep-fee" class="stat-val mono" style="color:var(--bad)">0</div>  </div>
+  <div class="stat-card">    <div class="stat-label">기간 수수료 (Total Fee, KRW 합산)</div>    <div id="rep-fee" class="stat-val mono" style="color:var(--bad)">0</div>    <div style="font-size:10px; color:var(--muted)">KRW / USD: <b id="rep-fee-breakdown">₩0 / $0.00</b></div>  </div>
   <!-- 3. 기간 순손익 (수수료 차감 후) -->
-  <div class="stat-card">    <div class="stat-label">기간 순손익 (Net PnL)</div>    <div id="rep-net" class="stat-val mono" style="color:var(--accent)">0</div>  </div>
+  <div class="stat-card">    <div class="stat-label">기간 순손익 (Net PnL, KRW 합산)</div>    <div id="rep-net" class="stat-val mono" style="color:var(--accent)">0</div>    <div style="font-size:10px; color:var(--muted)">KRW / USD: <b id="rep-net-breakdown">₩0 / $0.00</b></div>  </div>
   <!-- 4. 체결/포지션 승률 -->
   <div class="stat-card">    <div class="stat-label">승률 (체결 / 포지션)</div>    <div id="rep-winrate" class="stat-val mono" style="font-size:13px;">-</div>  </div>
   <!-- 5. Profit Factor (체결 / 포지션) -->
@@ -328,7 +336,7 @@
             <thead>
               <tr>
                 <th>날짜</th><th>상품</th><th>구분</th><th>가격</th><th>수량</th><th>상태</th>
-                <th>실현손익</th><th>수수료</th><th>순손익</th><th>손익률</th><th>메모</th>
+                <th>실현손익(통화)</th><th>수수료(통화)</th><th>순손익(통화)</th><th>손익률</th><th>메모</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -384,9 +392,9 @@
 </div> <!-- // SETTINGS TAB END -->
 
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase.js"></script>
 <script src="js/app.js"></script>
-
-//* 20260208_2121수정 *//
 
 </body>
 </html>
