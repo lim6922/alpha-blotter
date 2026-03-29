@@ -18,6 +18,9 @@ let autoSyncTimer = null;
 let autoSyncInFlight = false;
 let autoSyncLastAttemptLocalAt = null;
 let autoImportFromCloudDone = false;
+let autoImportInFlight = false;
+let autoImportDoneUserId = null;
+let authAutoActionsBound = false;
 
 function setAutoSyncStatus(text, className = '') {
   const statusEl = document.getElementById('autosync-status');
@@ -30,6 +33,71 @@ function setAutoSyncStatus(text, className = '') {
 
 function initAutoSyncUI() {
   autoSyncCanRun = false;
+}
+
+async function runAutoCloudActionsForUser(user, source = 'manual') {
+  if (!user?.id) {
+    autoSyncCanRun = false;
+    return false;
+  }
+
+  const allowed = await isAllowedEmail(user.email);
+  if (!allowed) {
+    autoSyncCanRun = false;
+    autoImportDoneUserId = null;
+    await supabaseClient.auth.signOut();
+    console.warn('auto cloud actions skipped: not allowed user');
+    return false;
+  }
+
+  if (autoImportDoneUserId !== user.id) {
+    if (!autoImportInFlight) {
+      autoImportInFlight = true;
+      try {
+        await importFromCloudInternal({ user, skipConfirm: true, silent: true, source });
+        autoImportFromCloudDone = true;
+      } finally {
+        autoImportInFlight = false;
+      }
+    }
+    autoImportDoneUserId = user.id;
+  }
+
+  autoSyncCanRun = true;
+  maybeScheduleAutoSync();
+  return true;
+}
+
+async function runAutoCloudActionsFromSession(source = 'manual') {
+  const { data, error } = await supabaseClient.auth.getSession();
+  if (error) {
+    console.error('session restore failed for auto actions:', error.message);
+    autoSyncCanRun = false;
+    return false;
+  }
+
+  return runAutoCloudActionsForUser(data?.session?.user || null, source);
+}
+
+function bindAuthAutoActions() {
+  if (authAutoActionsBound) return;
+  authAutoActionsBound = true;
+
+  supabaseClient.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_OUT') {
+      autoSyncCanRun = false;
+      autoImportInFlight = false;
+      autoImportDoneUserId = null;
+      autoImportFromCloudDone = false;
+      await updateSyncAuthUI();
+      return;
+    }
+
+    if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      await runAutoCloudActionsForUser(session?.user || null, `auth-${event}`);
+      await updateSyncAuthUI();
+    }
+  });
 }
 
 function maybeScheduleAutoSync(statusOverride = null) {
@@ -308,10 +376,18 @@ async function updateSyncAuthUI() {
     statusEl.classList.add('sync-auth-on');
 
     if (btnEl) btnEl.innerText = '로그아웃';
-    autoSyncCanRun = true;
-    maybeScheduleAutoSync();
+
+    if (autoImportDoneUserId === user.id && !autoImportInFlight) {
+      autoSyncCanRun = true;
+      maybeScheduleAutoSync();
+    } else {
+      autoSyncCanRun = false;
+    }
   } else {
     autoSyncCanRun = false;
+    autoImportDoneUserId = null;
+    autoImportFromCloudDone = false;
+
     statusEl.innerText = '로그인 필요';
     statusEl.classList.remove('sync-auth-on');
     statusEl.classList.add('sync-auth-off');
@@ -2296,27 +2372,15 @@ window.onload = async () => {
   syncMarketPrices();
   updateSyncHeader();
   initAutoSyncUI();
+  bindAuthAutoActions();
 
-  const { data, error } = await supabaseClient.auth.getSession();
-  if (error) {
-    console.error("Supabase session restore failed:", error.message);
-  } else if (data?.session) {
-    const allowed = await isAllowedEmail(data.session.user?.email);
-
-    if (!allowed) {
-      await supabaseClient.auth.signOut();
-      alert("허용되지 않은 계정입니다. 관리자의 허용이 필요합니다.");
-    } else {
-      console.log("Supabase session restored:", data.session.user?.email || data.session.user?.id);
-
-      if (!autoImportFromCloudDone) {
-        autoImportFromCloudDone = true;
-        await importFromCloudInternal({ user: data.session.user, skipConfirm: true, silent: true, source: 'auto-login' });
-      }
-    }
-  }
-
+  await runAutoCloudActionsFromSession('boot');
   await updateSyncAuthUI();
+
+  setTimeout(async () => {
+    await runAutoCloudActionsFromSession('boot-delayed');
+    await updateSyncAuthUI();
+  }, 1500);
 };
 
 
