@@ -297,6 +297,20 @@ let isStealth = false;
 let editingId = null;
 let editingAsset = null;
 let historyFocusKey = null;
+const tableSortState = {
+  history: { key: 'inputOrder', dir: 'desc' },
+  report: { key: 'date', dir: 'desc' }
+};
+const tableSortLabels = {
+  history: {
+    inputOrder: '입력순', date: '일자', asset: '상품', side: '구분', price: '가격', qty: '수량',
+    status: '상태', stopLoss: '스탑', netPnlCur: '순손익(통화)', netPct: '손익률', memo: '메모'
+  },
+  report: {
+    date: '날짜', asset: '상품', side: '구분', price: '가격', qty: '수량', status: '상태',
+    realizedPnlCur: '실현손익(통화)', feeCur: '수수료(통화)', netPnlCur: '순손익(통화)', netPct: '손익률', memo: '메모'
+  }
+};
 
 /**
  * =========================
@@ -1229,6 +1243,40 @@ function safeNum(x, d=0){ const n=parseFloat(x); return isNaN(n)?d:n; }
 function isLongSide(side){ return side === "Buy"; }
 function sideLabel(side){ return isLongSide(side) ? "Long" : "Short"; }
 function sidePill(side){ return `<span class="pill ${isLongSide(side) ? 'pill-long' : 'pill-short'}">${sideLabel(side)}</span>`; }
+function compareSortValues(a, b) {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  return String(a).localeCompare(String(b), 'ko', { numeric: true, sensitivity: 'base' });
+}
+function sortRows(rows, tableName) {
+  const { key, dir } = tableSortState[tableName];
+  const mult = dir === 'asc' ? 1 : -1;
+  return rows.slice().sort((a, b) => {
+    const result = compareSortValues(a[key], b[key]);
+    if (result !== 0) return result * mult;
+    return compareSortValues(a.date, b.date) * -1;
+  });
+}
+function refreshSortHeaders() {
+  Object.entries(tableSortLabels).forEach(([tableName, labels]) => {
+    const state = tableSortState[tableName];
+    Object.entries(labels).forEach(([key, label]) => {
+      const el = document.getElementById(`${tableName}-sort-${key}`);
+      if (!el) return;
+      const arrow = state.key === key ? (state.dir === 'asc' ? ' ▲' : ' ▼') : '';
+      el.textContent = label + arrow;
+    });
+  });
+}
+function toggleTableSort(tableName, key) {
+  const state = tableSortState[tableName];
+  if (state.key === key) state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+  else { state.key = key; state.dir = 'asc'; }
+  if (tableName === 'history') renderAll();
+  else renderPerformanceReport();
+}
 function getTradeInputOrderMap(sourceTrades = trades) {
   const orderMap = new Map();
   sourceTrades.forEach((t, idx) => orderMap.set(t.id, idx + 1));
@@ -1813,6 +1861,7 @@ function renderTables(res, margin) {
   openBody.innerHTML = '';
   histBody.innerHTML = '';
   updateHistoryFocusUi();
+  refreshSortHeaders();
 
   const editingTrade = editingId ? trades.find(t => t.id === editingId) : null;
   const editingKey = editingTrade ? `${editingTrade.asset}_${editingTrade.maturity}` : null;
@@ -1856,31 +1905,44 @@ function renderTables(res, margin) {
     `;
   });
 
-  res.processed.slice().reverse().forEach(t => {
+  const historyRows = res.processed.map(t => {
     const posKey = `${t.asset}_${t.maturity}`;
     const isSquared = !res.openPos.some(p => p.key === posKey);
     const residualQty = res.residualTradeQtyMap[t.id] || 0;
     const tradeStatus = t.isCloseTrade ? 'CLOSE' : 'OPEN';
     const contributesToOpen = residualQty > 0;
-    const qtyHint = contributesToOpen
-      ? `<span class="pill pill-live">잔존 ${residualQty}</span>`
-      : ((t.isCloseTrade && !isSquared) ? `<span class="pill" style="opacity:.7">포지션 진행중</span>` : '');
+    return {
+      ...t,
+      posKey,
+      isSquared,
+      residualQty,
+      tradeStatus,
+      contributesToOpen,
+      inputOrder: inputOrderMap.get(t.id) || 0,
+      status: `${tradeStatus}_${isSquared ? 'SQUARED' : 'OPEN'}_${residualQty > 0 ? 'LIVE' : 'FLAT'}`
+    };
+  });
+
+  sortRows(historyRows, 'history').forEach(t => {
+    const qtyHint = t.contributesToOpen
+      ? `<span class="pill pill-live">잔존 ${t.residualQty}</span>`
+      : ((t.isCloseTrade && !t.isSquared) ? `<span class="pill" style="opacity:.7">포지션 진행중</span>` : '');
     const statusLabel = `
-      <span class="pill">${tradeStatus}</span>
-      ${isSquared ? `<span class="pill up">SQUARED</span>` : `<span class="pill muted">OPEN</span>`}
+      <span class="pill">${t.tradeStatus}</span>
+      ${t.isSquared ? `<span class="pill up">SQUARED</span>` : `<span class="pill muted">OPEN</span>`}
       ${qtyHint}
     `;
     const isEditingThis = (t.id === editingId);
-    const isRelatedToFocus = (posKey === historyFocusKey);
+    const isRelatedToFocus = (t.posKey === historyFocusKey);
     const rowClass = [
       isEditingThis ? 'edit-active-row' : '',
       isRelatedToFocus ? 'history-focus-row' : '',
-      !isRelatedToFocus && contributesToOpen ? 'history-related-row' : ''
+      !isRelatedToFocus && t.contributesToOpen ? 'history-related-row' : ''
     ].filter(Boolean).join(' ');
 
     histBody.innerHTML += `
       <tr class="${rowClass}">
-        <td><span class="pill pill-order">#${inputOrderMap.get(t.id) || '-'}</span></td>
+        <td><span class="pill pill-order">#${t.inputOrder || '-'}</span></td>
         <td>${t.date}</td>
         <td>${t.asset}</td>
         <td>${sidePill(t.side)}</td>
@@ -2490,8 +2552,14 @@ function renderPerformanceReport() {
 
   const body = document.querySelector('#repDetailTable tbody');
   body.innerHTML = '';
+  refreshSortHeaders();
 
-  filtered.forEach(t => {
+  const reportRows = sortRows(filtered.map(t => ({
+    ...t,
+    status: t.currentNetQty === 0 ? 'SQUARED' : (t.isCloseTrade ? 'CLOSE' : 'OPEN')
+  })), 'report');
+
+  reportRows.forEach(t => {
     // 1. 기본 손익/수수료 누적
     if (t.cur === "USD") {
       realizedUSD += t.realizedPnlCur;
@@ -2512,7 +2580,7 @@ function renderPerformanceReport() {
     }
 
     // 3. 테이블 행 추가
-    let statusLabel = t.currentNetQty === 0 ? 'SQUARED' : (t.isCloseTrade ? 'CLOSE' : 'OPEN');
+    const statusLabel = t.status;
     body.innerHTML += `
       <tr>
         <td>${t.date}</td>

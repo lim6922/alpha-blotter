@@ -261,6 +261,8 @@ header {
 
 table { width: 100%; border-collapse: collapse; font-size: 11px; }
 th { background: #1a1f2e; padding: 8px; color: var(--muted); text-align: left; position: sticky; top: 0; z-index: 10; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--text); }
 td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 #openPosTable, #historyTable { min-width: 1120px; }
 #openPosTable th, #openPosTable td,
