@@ -22,6 +22,47 @@ let autoImportInFlight = false;
 let autoImportDoneUserId = null;
 let authAutoActionsBound = false;
 
+function applySyncAuthState(session = null, options = {}) {
+  const { keepImportState = false } = options;
+  const statusEl = document.getElementById('sync-auth-status');
+  const btnEl = document.getElementById('syncAuthBtn');
+
+  if (!statusEl) return;
+
+  const user = session?.user || null;
+
+  if (user) {
+    const email = user.email || 'Google User';
+    statusEl.innerText = `로그인됨 · ${email}`;
+    statusEl.classList.remove('sync-auth-off');
+    statusEl.classList.add('sync-auth-on');
+
+    if (btnEl) btnEl.innerText = '로그아웃';
+
+    if (autoImportDoneUserId === user.id && !autoImportInFlight) {
+      autoSyncCanRun = true;
+      maybeScheduleAutoSync();
+    } else {
+      autoSyncCanRun = false;
+    }
+
+    return;
+  }
+
+  autoSyncCanRun = false;
+
+  if (!keepImportState) {
+    autoImportDoneUserId = null;
+    autoImportFromCloudDone = false;
+  }
+
+  statusEl.innerText = '로그인 필요';
+  statusEl.classList.remove('sync-auth-on');
+  statusEl.classList.add('sync-auth-off');
+
+  if (btnEl) btnEl.innerText = '동기화 로그인';
+}
+
 function setAutoSyncStatus(text, className = '') {
   const statusEl = document.getElementById('autosync-status');
   if (!statusEl) return;
@@ -83,24 +124,26 @@ function bindAuthAutoActions() {
   if (authAutoActionsBound) return;
   authAutoActionsBound = true;
 
-  supabaseClient.auth.onAuthStateChange(async (event, session) => {
+  supabaseClient.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
       autoSyncCanRun = false;
       autoImportInFlight = false;
       autoImportDoneUserId = null;
       autoImportFromCloudDone = false;
-      await updateSyncAuthUI();
+      applySyncAuthState(null);
       return;
     }
 
     if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-      // 로그인 상태 표시는 즉시 갱신하고, import/export 자동 처리는 백그라운드로 실행
-      await updateSyncAuthUI();
-      runAutoCloudActionsForUser(session?.user || null, `auth-${event}`)
-        .catch((err) => console.error('auto cloud actions failed:', err))
-        .finally(() => {
-          updateSyncAuthUI();
-        });
+      applySyncAuthState(session, { keepImportState: true });
+
+      setTimeout(() => {
+        runAutoCloudActionsForUser(session?.user || null, `auth-${event}`)
+          .catch((err) => console.error('auto cloud actions failed:', err))
+          .finally(() => {
+            updateSyncAuthUI();
+          });
+      }, 0);
     }
   });
 }
@@ -354,7 +397,12 @@ function getTimestamp() {
 
 
 
-async function updateSyncAuthUI() {
+async function updateSyncAuthUI(sessionOverride = undefined) {
+  if (sessionOverride !== undefined) {
+    applySyncAuthState(sessionOverride, { keepImportState: !sessionOverride?.user });
+    return;
+  }
+
   const statusEl = document.getElementById('sync-auth-status');
   const btnEl = document.getElementById('syncAuthBtn');
 
@@ -372,33 +420,7 @@ async function updateSyncAuthUI() {
     return;
   }
 
-  const user = data?.session?.user;
-
-  if (user) {
-    const email = user.email || 'Google User';
-    statusEl.innerText = `로그인됨 · ${email}`;
-    statusEl.classList.remove('sync-auth-off');
-    statusEl.classList.add('sync-auth-on');
-
-    if (btnEl) btnEl.innerText = '로그아웃';
-
-    if (autoImportDoneUserId === user.id && !autoImportInFlight) {
-      autoSyncCanRun = true;
-      maybeScheduleAutoSync();
-    } else {
-      autoSyncCanRun = false;
-    }
-  } else {
-    autoSyncCanRun = false;
-    autoImportDoneUserId = null;
-    autoImportFromCloudDone = false;
-
-    statusEl.innerText = '로그인 필요';
-    statusEl.classList.remove('sync-auth-on');
-    statusEl.classList.add('sync-auth-off');
-
-    if (btnEl) btnEl.innerText = '동기화 로그인';
-  }
+  applySyncAuthState(data?.session || null);
 }
 
 async function getCurrentUserOrAlert() {
