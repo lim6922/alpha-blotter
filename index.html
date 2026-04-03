@@ -102,7 +102,7 @@
 
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
           <div><label style="font-size:10px; color:var(--muted)">체결일</label><input type="date" id="tradeDate" onchange="syncMaturityFromDTE()" /></div>
-          <div><label style="font-size:10px; color:var(--muted)">구분</label><select id="side"><option value="Buy">BUY</option><option value="Sell">SELL</option></select></div>
+          <div><label style="font-size:10px; color:var(--muted)">구분</label><select id="side"><option value="Buy">LONG</option><option value="Sell">SHORT</option></select></div>
 
           <!-- 만기일-DTE 자동 계산 영역 -->
           <div class="date-sync-grid">
@@ -176,7 +176,7 @@
             <thead>
               <tr>
                 <th>상품/만기</th><th>구분</th><th>DTE</th><th>잔고</th><th>평단가</th><th style="width:90px;">현재가</th>
-                <th>스탑</th><th>스탑까지%</th><th>PnL%</th><th>평가손익</th><th>메모</th>
+                <th>스탑</th><th>스탑까지%</th><th>PnL%</th><th>평가손익</th><th>메모</th><th>연결</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -184,12 +184,16 @@
         </div>
 
         <!-- 2-3. 개별 체결 이력 (Trade History) -->
-        <h2 style="margin-top:20px;">Trade History</h2>
+        <h2 style="margin-top:20px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span>Trade History</span>
+          <span id="historyFocusLabel" class="pill hidden"></span>
+          <button id="historyFocusResetBtn" class="btn-outline btn-xs hidden" onclick="clearHistoryFocus()">전체 보기</button>
+        </h2>
         <div class="table-wrap">
           <table id="historyTable">
             <thead>
               <tr>
-                <th>일자</th><th>상품</th><th>구분</th><th>가격</th><th>수량</th><th>상태</th>
+                <th>입력순</th><th>일자</th><th>상품</th><th>구분</th><th>가격</th><th>수량</th><th>상태</th>
                 <th>스탑</th><th>순손익(통화)</th><th>손익률</th><th>액션</th><th>메모</th>
               </tr>
             </thead>

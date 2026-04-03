@@ -309,6 +309,8 @@ button {
     transition: 0.2s;
 }
 
+.btn-xs { padding: 4px 8px; font-size: 10px; }
+
 .btn-blue { background: var(--accent); color: white; width: 100%; }
 .btn-green { background: #15311e; color: #4ade80; border: 1px solid #244d34; font-size: 10px; }
 .btn-outline { background: transparent; border: 1px solid var(--line); color: var(--muted); }
@@ -435,6 +437,10 @@ button {
 /* 편집 모드 하이라이트 */
 .edit-active { border: 2px solid var(--warn) !important; background: rgba(251, 191, 36, 0.05) !important; }
 .edit-active-row { background: rgba(251, 191, 36, 0.2) !important; border-left: 4px solid var(--warn) !important; }
+.history-related-row { background: rgba(59, 130, 246, 0.10) !important; }
+.history-focus-row { background: rgba(59, 130, 246, 0.16) !important; border-left: 4px solid #60a5fa !important; }
+.pill-live { color: #93c5fd; border-color: #1d4ed8; background: rgba(29, 78, 216, 0.18); }
+.pill-order { color: #fcd34d; border-color: #92400e; background: rgba(146, 64, 14, 0.18); }
 
 /* 싱크 상태 컬러링 */
 .sync-ok { color: var(--good); }
