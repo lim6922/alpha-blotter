@@ -39,8 +39,15 @@
 <div class="header-actions">
   <div class="header-actions-row">
     <input type="file" id="csvImport" style="display:none;" onchange="importFromCSV(event)" />
+
     <span id="sync-auth-status" class="sync-auth-status sync-auth-off">로그인 필요</span>
     <button class="btn-outline btn-sync" id="syncAuthBtn" onclick="handleSyncAuth()">동기화 로그인</button>
+
+    <!-- 모바일 전용: 시세/싱크 접기/펼치기 -->
+    <button class="btn-outline btn-sync mobile-only" id="toggleHeaderInfoBtn" onclick="toggleHeaderInfo()">
+      시세/싱크 펼치기
+    </button>
+
     <button class="btn-outline btn-sync" onclick="importFromCloud()">동기화 가져오기</button>
     <button class="btn-outline btn-sync" onclick="exportToCloud()">동기화 내보내기</button>
     <button class="btn-outline" onclick="document.getElementById('csvImport').click()">CSV 가져오기</button>

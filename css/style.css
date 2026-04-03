@@ -450,67 +450,8 @@ button {
 /* =========================================================================
    [9] RESPONSIVE (MOBILE)
    ========================================================================= */
-@media (max-width: 768px) {
-    html, body { overflow-x: hidden; overflow-y: auto; }
-
-    header { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; }
-    .header-left { flex-direction: column; width: 100%; }
-    
-    #fx-container { width: 100%; flex-wrap: wrap; border-radius: 8px; min-width: 0; }
-    #sync-bar { width: 100%; justify-content: space-between; margin-left: 0; display: grid; grid-template-columns: 1fr 1fr 1fr; }
-
-    .header-actions {
-        width: 100%;
-        align-items: stretch;
-        gap: 6px;
-       min-width: 0;
-    }
-
-    .header-actions-row {
-        justify-content: flex-start;
-        width: 100%;
-        gap: 6px;
-    }
-
-    .header-actions-row button,
-    .header-actions-row .sync-auth-status {
-        flex: 1 1 calc(50% - 6px);
-        min-width: 140px;
-    }
-
-    .header-tool-single {
-        padding-top: 0;
-    }
-
-    .header-tool-group {
-        min-width: 0;
-        width: 100%;
-    }
-
-    .header-tool-buttons {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 6px;
-    }
-
-    .header-divider {
-        display: none;
-    }
-
-    /* 대시보드 그리드 해제 */
-    .main-grid { display: block; height: auto; }
-    .scroll-col { width: 100%; overflow: visible; margin-bottom: 16px; }
-    .tab-content { height: auto !important; overflow: visible !important; }
-
-    /* 테이블 가로 스크롤 허용 */
-    .table-wrap { overflow-x: auto; }
-    table { min-width: 850px; }
-    
-    /* 리포트 레이아웃 조정 */
-    .report-filter { flex-direction: column; align-items: stretch; }
-    .filter-item input { width: 100%; }
-    .summary-grid { grid-template-columns: repeat(2, 1fr); }
-    .master-grid { grid-template-columns: 1fr 1fr; }
+.mobile-only {
+    display: none;
 }
 
 @media (max-width: 768px) {
@@ -520,24 +461,75 @@ button {
     }
 
     header {
+        display: flex;
         flex-direction: column;
         align-items: stretch;
-        gap: 6px;
+        gap: 8px;
         padding: 8px 10px;
-        margin-top: 0; /* 모바일에서 상단 여백 제거 */
+        margin-top: 0;
+    }
+
+    /* 로그인/버튼 영역을 모바일 최상단으로 */
+    .header-actions {
+        order: 1;
+        width: 100%;
+        align-items: stretch;
+        min-width: 0;
     }
 
     .header-left {
+        order: 2;
         flex-direction: column;
         width: 100%;
         gap: 6px;
     }
 
-    /* 시세/싱크 박스 자체 높이 압축 */
+    .header-left h1 {
+        font-size: 13px !important;
+        line-height: 1.2;
+        margin: 0;
+    }
+
+    .mobile-only {
+        display: inline-flex;
+    }
+
+    .header-actions-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .header-actions-row button,
+    .header-actions-row .sync-auth-status {
+        width: 100%;
+        min-width: 0;
+        font-size: 10px;
+        padding: 6px 8px;
+        height: 30px;
+        box-sizing: border-box;
+    }
+
+    /* 로그인 상태 / 로그인 버튼 우선 강조 */
+    #sync-auth-status {
+        grid-column: 1 / -1;
+    }
+
+    #syncAuthBtn {
+        grid-column: 1 / 2;
+    }
+
+    #toggleHeaderInfoBtn {
+        grid-column: 2 / 3;
+    }
+
+    /* 모바일에서 시세/싱크 박스 기본 접기 */
     #fx-container {
         width: 100%;
         min-width: 0;
-        display: flex;
+        display: none;
         flex-direction: column;
         gap: 6px;
         padding: 6px 8px;
@@ -545,19 +537,25 @@ button {
         overflow: hidden;
     }
 
-    /* 싱크바를 3등분 유지하되 아주 작게 */
+    /* 펼쳤을 때만 노출 */
+    #fx-container.expanded {
+        display: flex;
+    }
+
     #sync-bar {
         width: 100%;
         display: grid !important;
         grid-template-columns: repeat(3, 1fr);
         gap: 6px !important;
+        margin-left: 0 !important;
         font-size: 9px !important;
     }
 
     #sync-bar > div {
-        background: rgba(255,255,255,0.03);
-        border-radius: 6px;
+        min-width: 0;
         padding: 4px 6px;
+        border-radius: 6px;
+        background: rgba(255,255,255,0.03);
     }
 
     #sync-bar b,
@@ -566,17 +564,19 @@ button {
         line-height: 1.15;
     }
 
-    /* 실시간 시세줄은 여러 줄 금지, 가로 스크롤 */
+    /* 실시간 시세는 한 줄 + 가로스크롤 */
     #fx-monitor {
         display: flex;
         flex-wrap: nowrap;
         overflow-x: auto;
         overflow-y: hidden;
         gap: 8px;
+        row-gap: 0;
         white-space: nowrap;
-        padding-bottom: 2px;
-        -webkit-overflow-scrolling: touch;
+        min-width: 0;
+        flex: 1 1 auto;
         scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
     }
 
     #fx-monitor::-webkit-scrollbar {
@@ -594,39 +594,9 @@ button {
         margin-left: 0;
         width: 100%;
         font-size: 9px;
-    }
-
-    .header-actions {
-        width: 100%;
-        min-width: 0;
-        align-items: stretch;
-    }
-
-    .header-actions-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 6px;
-        width: 100%;
-    }
-
-    /* 버튼 높이와 글자 줄이기 */
-    .header-actions-row button,
-    .header-actions-row .sync-auth-status {
-        min-width: 0;
-        width: 100%;
-        font-size: 10px;
-        padding: 6px 8px;
-        height: 30px;
-    }
-
-    /* 로그인 상태는 한 줄 전체 사용 */
-    #sync-auth-status {
-        grid-column: 1 / -1;
-    }
-
-    /* 중요 버튼 우선 노출 */
-    #syncAuthBtn {
-        grid-column: span 2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .header-divider {

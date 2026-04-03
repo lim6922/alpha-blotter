@@ -2660,5 +2660,12 @@ function getSyncStatus(local, imp, exp) {
   return 'WARN';
 }
 
+function toggleHeaderInfo() {
+  const fxContainer = document.getElementById('fx-container');
+  const toggleBtn = document.getElementById('toggleHeaderInfoBtn');
 
-//* 20260208_2121수정 *//
+  if (!fxContainer || !toggleBtn) return;
+
+  const expanded = fxContainer.classList.toggle('expanded');
+  toggleBtn.textContent = expanded ? '시세/싱크 접기' : '시세/싱크 펼치기';
+}
