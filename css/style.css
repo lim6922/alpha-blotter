@@ -513,25 +513,79 @@ button {
     .master-grid { grid-template-columns: 1fr 1fr; }
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 768px) {
+    html, body {
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
     header {
         flex-direction: column;
         align-items: stretch;
+        gap: 6px;
+        padding: 8px 10px;
+        margin-top: 0; /* 모바일에서 상단 여백 제거 */
     }
 
-    .header-left,
-    .header-actions {
+    .header-left {
+        flex-direction: column;
         width: 100%;
+        gap: 6px;
     }
 
+    /* 시세/싱크 박스 자체 높이 압축 */
     #fx-container {
+        width: 100%;
         min-width: 0;
-        flex-wrap: wrap;
-        align-items: center;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        overflow: hidden;
     }
 
+    /* 싱크바를 3등분 유지하되 아주 작게 */
+    #sync-bar {
+        width: 100%;
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px !important;
+        font-size: 9px !important;
+    }
+
+    #sync-bar > div {
+        background: rgba(255,255,255,0.03);
+        border-radius: 6px;
+        padding: 4px 6px;
+    }
+
+    #sync-bar b,
+    #sync-bar span {
+        font-size: 9px !important;
+        line-height: 1.15;
+    }
+
+    /* 실시간 시세줄은 여러 줄 금지, 가로 스크롤 */
     #fx-monitor {
-        flex: 1 1 100%;
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        gap: 8px;
+        white-space: nowrap;
+        padding-bottom: 2px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    #fx-monitor::-webkit-scrollbar {
+        display: none;
+    }
+
+    .price-tag {
+        font-size: 10px;
+        flex: 0 0 auto;
     }
 
     .sync-info {
@@ -539,5 +593,84 @@ button {
         padding-left: 0;
         margin-left: 0;
         width: 100%;
+        font-size: 9px;
+    }
+
+    .header-actions {
+        width: 100%;
+        min-width: 0;
+        align-items: stretch;
+    }
+
+    .header-actions-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        width: 100%;
+    }
+
+    /* 버튼 높이와 글자 줄이기 */
+    .header-actions-row button,
+    .header-actions-row .sync-auth-status {
+        min-width: 0;
+        width: 100%;
+        font-size: 10px;
+        padding: 6px 8px;
+        height: 30px;
+    }
+
+    /* 로그인 상태는 한 줄 전체 사용 */
+    #sync-auth-status {
+        grid-column: 1 / -1;
+    }
+
+    /* 중요 버튼 우선 노출 */
+    #syncAuthBtn {
+        grid-column: span 2;
+    }
+
+    .header-divider {
+        display: none;
+    }
+
+    .main-grid {
+        display: block;
+        height: auto;
+    }
+
+    .scroll-col {
+        width: 100%;
+        overflow: visible;
+        margin-bottom: 16px;
+    }
+
+    .tab-content {
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    .table-wrap {
+        overflow-x: auto;
+    }
+
+    table {
+        min-width: 850px;
+    }
+
+    .report-filter {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filter-item input {
+        width: 100%;
+    }
+
+    .summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .master-grid {
+        grid-template-columns: 1fr 1fr;
     }
 }
