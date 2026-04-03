@@ -522,8 +522,13 @@ button {
     }
 
     #toggleHeaderInfoBtn {
-        grid-column: 2 / 3;
-    }
+    grid-column: 2 / 3;
+
+    display: flex;
+    justify-content: center;  /* 텍스트 가운데 */
+    align-items: center;
+    text-align: center;
+}
 
     /* 모바일에서 시세/싱크 박스 기본 접기 */
     #fx-container {
