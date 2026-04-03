@@ -1877,12 +1877,13 @@ function renderTables(res, margin) {
       ? residualTrades.map(t => `#${inputOrderMap.get(t.id) || '-'} ${sideLabel(t.side)} ${res.residualTradeQtyMap[t.id]}`).join(' / ')
       : '-';
 
+    const qtyDisplay = Math.abs(p.qty);
     openBody.innerHTML += `
       <tr class="${isRelated ? 'edit-active-row' : ''} ${isFocused ? 'history-focus-row' : ''}">
         <td><b>${p.asset}</b><br><small style="color:var(--muted)">${p.maturity || '-'}</small></td>
         <td>${sidePill(p.qty > 0 ? 'Buy' : 'Sell')}</td>
         <td class="${dte <= 3 ? 'down' : ''}">${isNaN(dte) ? '-' : dte + 'd'}</td>
-        <td class="${p.qty > 0 ? 'up' : 'down'}">${p.qty}</td>
+        <td class="${p.qty > 0 ? 'up' : 'down'}">${qtyDisplay}</td>
         <td>${Number(p.avgPrice).toFixed(2)}</td>
         <td>
           <input type="number"
