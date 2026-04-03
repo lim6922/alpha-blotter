@@ -1228,6 +1228,7 @@ async function syncMarketPrices() {
 function safeNum(x, d=0){ const n=parseFloat(x); return isNaN(n)?d:n; }
 function isLongSide(side){ return side === "Buy"; }
 function sideLabel(side){ return isLongSide(side) ? "Long" : "Short"; }
+function sidePill(side){ return `<span class="pill ${isLongSide(side) ? 'pill-long' : 'pill-short'}">${sideLabel(side)}</span>`; }
 function getTradeInputOrderMap(sourceTrades = trades) {
   const orderMap = new Map();
   sourceTrades.forEach((t, idx) => orderMap.set(t.id, idx + 1));
@@ -1830,7 +1831,7 @@ function renderTables(res, margin) {
     openBody.innerHTML += `
       <tr class="${isRelated ? 'edit-active-row' : ''} ${isFocused ? 'history-focus-row' : ''}">
         <td><b>${p.asset}</b><br><small style="color:var(--muted)">${p.maturity || '-'}</small></td>
-        <td style="color:${p.qty > 0 ? 'var(--good)' : 'var(--bad)'}">${p.qty > 0 ? 'Long' : 'Short'}</td>
+        <td>${sidePill(p.qty > 0 ? 'Buy' : 'Sell')}</td>
         <td class="${dte <= 3 ? 'down' : ''}">${isNaN(dte) ? '-' : dte + 'd'}</td>
         <td class="${p.qty > 0 ? 'up' : 'down'}">${p.qty}</td>
         <td>${Number(p.avgPrice).toFixed(2)}</td>
@@ -1882,7 +1883,7 @@ function renderTables(res, margin) {
         <td><span class="pill pill-order">#${inputOrderMap.get(t.id) || '-'}</span></td>
         <td>${t.date}</td>
         <td>${t.asset}</td>
-        <td class="${isLongSide(t.side) ? 'up' : 'down'}">${sideLabel(t.side)}</td>
+        <td>${sidePill(t.side)}</td>
         <td>${t.price}</td>
         <td>${t.qty}</td>
         <td>${statusLabel}</td>
@@ -2516,7 +2517,7 @@ function renderPerformanceReport() {
       <tr>
         <td>${t.date}</td>
         <td>${t.asset}</td>
-        <td class="${isLongSide(t.side) ? 'up' : 'down'}">${sideLabel(t.side)}</td>
+        <td>${sidePill(t.side)}</td>
         <td>${t.price.toLocaleString()}</td>
         <td>${t.qty}</td>
         <td><span class="pill">${statusLabel}</span></td>
