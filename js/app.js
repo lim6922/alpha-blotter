@@ -300,7 +300,7 @@ let editingAsset = null;
 let historyFocusKey = null;
 const tableSortState = {
   history: { key: 'inputOrder', dir: 'desc' },
-  report: { key: 'date', dir: 'desc' }
+  report: { key: 'inputOrder', dir: 'asc' }
 };
 const tableSortLabels = {
   history: {
@@ -308,7 +308,7 @@ const tableSortLabels = {
     status: '상태', stopLoss: '스탑', netPnlCur: '순손익(통화)', netPct: '손익률', memo: '메모'
   },
   report: {
-    date: '날짜', asset: '상품', side: '구분', price: '가격', qty: '수량', status: '상태',
+    inputOrder: '입력순', date: '날짜', asset: '상품', side: '구분', price: '가격', qty: '수량', status: '상태',
     realizedPnlCur: '실현손익(통화)', feeCur: '수수료(통화)', netPnlCur: '순손익(통화)', netPct: '손익률', memo: '메모'
   }
 };
@@ -2537,13 +2537,18 @@ function renderPerformanceReport() {
   const end = document.getElementById('repEndDate').value;
   const res = calculateEngine();
   const processed = res.processed;
+  const inputOrderMap = getTradeInputOrderMap(trades);
   initReportAssetFilter(processed);
   const assetFilter = document.getElementById("repAssetFilter")?.value || "ALL";
 
   // 데이터 필터링 및 시간순 정렬
   const filtered = processed
     .filter(t => (!start || t.date >= start) && (!end || t.date <= end) && (assetFilter === "ALL" || t.asset === assetFilter))
-    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    .map(t => ({
+      ...t,
+      inputOrder: inputOrderMap.get(t.id) || 0
+    }))
+    .sort((a, b) => (a.inputOrder || 0) - (b.inputOrder || 0));
 
   // --- [차트 업데이트 실행] ---
   updateIntegratedChart(filtered);
@@ -2592,6 +2597,7 @@ function renderPerformanceReport() {
     const statusLabel = t.status;
     body.innerHTML += `
       <tr>
+        <td>${t.inputOrder || '-'}</td>
         <td>${t.date}</td>
         <td>${t.asset}</td>
         <td>${sidePill(t.side)}</td>
@@ -2678,13 +2684,14 @@ function updateIntegratedChart(filteredTrades) {
     const isLong = isLongSide(t.side);
     const eventType = t.isCloseTrade ? 'close' : (isLong ? 'long-entry' : 'short-entry');
     return {
-      x: `${t.date} (#${index + 1})`,
+      x: `#${t.inputOrder || (index + 1)} ${t.date}`,
       price: t.price,
       individualPnL: Math.round(t.netPnlKRW),
       individualPnlCur: t.netPnlCur,
       cumulative: Math.round(cumulativePnL),
       side: t.side,
       asset: t.asset,
+      inputOrder: t.inputOrder || (index + 1),
       cur: t.cur,
       qty: t.qty,
       eventType,
