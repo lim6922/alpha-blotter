@@ -245,6 +245,30 @@ header {
     align-items: center;
 }
 
+/* 카드 접기/펼치기 지원 */
+.card.collapsed {
+    min-height: auto !important;
+    padding-bottom: 5px;
+}
+.card.collapsed > *:not(h2) {
+    display: none !important;
+}
+.btn-toggle {
+    background: var(--line);
+    color: var(--muted);
+    border: none;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    cursor: pointer;
+    transition: 0.2s;
+    margin-left: 10px;
+}
+.btn-toggle:hover {
+    background: var(--accent);
+    color: white;
+}
+
 /* 하이라이트 카드 (리스크 모니터 등 강조용) */
 .highlight-card {
     border: 1px solid var(--accent);

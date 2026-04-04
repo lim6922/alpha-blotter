@@ -331,7 +331,10 @@
           <div class="card" style="margin-bottom: 20px; min-height: 480px; background: linear-gradient(180deg, #141824 0%, #0b0d12 100%);">
       <h2 style="display: flex; justify-content: space-between;">
         <span>📈 통합 성과 및 가격 분석 (Price & PnL Insights)</span>
-        <span style="font-size: 10px; font-weight: normal; color: var(--muted);">* 단일 상품 필터링 시 가격 추이가 더 정확합니다.</span>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 10px; font-weight: normal; color: var(--muted);">* 단일 상품 필터링 시 가격 추이가 더 정확합니다.</span>
+          <button class="btn-toggle" onclick="toggleCollapse(this)">접기</button>
+        </div>
       </h2>
       <div id="integrated-analysis-chart" style="margin-top: 15px;"></div>
     </div>
@@ -351,7 +354,10 @@
 </div>
 
       <div class="card">
-        <h2>Period Trade History (기간 내 거래 상세)</h2>
+        <h2 style="display: flex; justify-content: space-between; align-items: center;">
+          <span>Period Trade History (기간 내 거래 상세)</span>
+          <button class="btn-toggle" onclick="toggleCollapse(this)">접기</button>
+        </h2>
         <div class="table-wrap">
           <table id="repDetailTable">
             <thead>

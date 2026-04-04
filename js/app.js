@@ -2539,15 +2539,11 @@ function renderPerformanceReport() {
   const processed = res.processed;
   initReportAssetFilter(processed);
   const assetFilter = document.getElementById("repAssetFilter")?.value || "ALL";
-  // 선택한 기간에 해당하는 거래만 필터링
-  const filtered = processed.filter(t => (!start || t.date >= start) && (!end || t.date <= end) && (assetFilter === "ALL" || t.asset === assetFilter));
 
-
-
-    // 데이터 필터링 및 시간순 정렬 (차트용)
-  const filtered = res.processed
+  // 데이터 필터링 및 시간순 정렬
+  const filtered = processed
     .filter(t => (!start || t.date >= start) && (!end || t.date <= end) && (assetFilter === "ALL" || t.asset === assetFilter))
-    .sort((a, b) => a.createdAt - b.createdAt);
+    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
   // --- [차트 업데이트 실행] ---
   updateIntegratedChart(filtered);
@@ -2692,7 +2688,7 @@ function updateIntegratedChart(filteredTrades) {
     },
     stroke: {
       width: [2, 3],
-      curve: ['smooth', 'stepped'] // 가격은 계단식으로 표현하여 진입가 유지 시각화
+      curve: ['smooth', 'stepline'] // 가격은 계단식으로 표현하여 진입가 유지 시각화
     },
     colors: ['#5673ff', '#fbbf24'], // 수익(파랑), 가격(노랑)
     fill: {
@@ -2710,10 +2706,7 @@ function updateIntegratedChart(filteredTrades) {
       },
       style: {
         fontSize: '10px',
-        colors: [function({ value, dataPointIndex }) {
-          const pnl = seriesData[dataPointIndex].individualPnL;
-          return pnl >= 0 ? '#4ade80' : '#ff5c5c';
-        }]
+        colors: seriesData.map(d => d.individualPnL >= 0 ? '#4ade80' : '#ff5c5c')
       },
       offsetY: -12,
       background: { enabled: true, foreColor: '#fff', padding: 3, borderRadius: 2, borderWidth: 0, opacity: 0.85 }
@@ -2925,3 +2918,15 @@ function toggleHeaderInfo() {
   const expanded = fxContainer.classList.toggle('expanded');
   toggleBtn.textContent = expanded ? '시세/싱크 접기' : '시세/싱크 펼치기';
 }
+
+ / * * 
+   *   [ ��ܭ]   9�X�  �0�/ ��X�0�  �� �  h��
+   * / 
+ f u n c t i o n   t o g g l e C o l l a p s e ( b t n )   { 
+     c o n s t   c a r d   =   b t n . c l o s e s t ( ' . c a r d ' ) ; 
+     i f   ( ! c a r d )   r e t u r n ; 
+     
+     c o n s t   i s C o l l a p s e d   =   c a r d . c l a s s L i s t . t o g g l e ( ' c o l l a p s e d ' ) ; 
+     b t n . i n n e r T e x t   =   i s C o l l a p s e d   ?   ' ��X�0�'   :   ' �0�' ; 
+ }  
+ 
