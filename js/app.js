@@ -2655,9 +2655,20 @@ function renderPerformanceReport() {
  * [신규] 통합 분석 차트 생성 함수
  */
 function updateIntegratedChart(filteredTrades) {
+  const chartEl = document.querySelector("#integrated-analysis-chart");
+  if (!chartEl) return;
+
+  if (typeof ApexCharts === 'undefined') {
+    chartEl.innerHTML = "<p style='text-align:center; padding:50px; color:var(--bad);'>차트 라이브러리를 불러오지 못했습니다.</p>";
+    return;
+  }
+
   if (filteredTrades.length === 0) {
-    if (integratedChart) integratedChart.destroy();
-    document.querySelector("#integrated-analysis-chart").innerHTML = "<p style='text-align:center; padding:50px; color:var(--muted);'>데이터가 없습니다.</p>";
+    if (integratedChart) {
+      integratedChart.destroy();
+      integratedChart = null;
+    }
+    chartEl.innerHTML = "<p style='text-align:center; padding:50px; color:var(--muted);'>데이터가 없습니다.</p>";
     return;
   }
 
@@ -2752,7 +2763,8 @@ function updateIntegratedChart(filteredTrades) {
   if (integratedChart) {
     integratedChart.updateOptions(options);
   } else {
-    integratedChart = new ApexCharts(document.querySelector("#integrated-analysis-chart"), options);
+    chartEl.innerHTML = '';
+    integratedChart = new ApexCharts(chartEl, options);
     integratedChart.render();
   }
 }
@@ -2919,14 +2931,10 @@ function toggleHeaderInfo() {
   toggleBtn.textContent = expanded ? '시세/싱크 접기' : '시세/싱크 펼치기';
 }
 
- / * * 
-   *   [ ��ܭ]   9�X�  �0�/ ��X�0�  �� �  h��
-   * / 
- f u n c t i o n   t o g g l e C o l l a p s e ( b t n )   { 
-     c o n s t   c a r d   =   b t n . c l o s e s t ( ' . c a r d ' ) ; 
-     i f   ( ! c a r d )   r e t u r n ; 
-     
-     c o n s t   i s C o l l a p s e d   =   c a r d . c l a s s L i s t . t o g g l e ( ' c o l l a p s e d ' ) ; 
-     b t n . i n n e r T e x t   =   i s C o l l a p s e d   ?   ' ��X�0�'   :   ' �0�' ; 
- }  
- 
+function toggleCollapse(btn) {
+  const card = btn.closest('.card');
+  if (!card) return;
+
+  const isCollapsed = card.classList.toggle('collapsed');
+  btn.innerText = isCollapsed ? '펼치기' : '접기';
+}
