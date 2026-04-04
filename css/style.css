@@ -432,6 +432,33 @@ button {
     margin-bottom: 20px;
 }
 
+/* 통합 차트 카드 배경 및 텍스트 보정 */
+#integrated-analysis-chart {
+    width: 100%;
+    border-radius: 8px;
+}
+
+/* ApexCharts 툴팁 커스텀 */
+.apexcharts-tooltip {
+    background: #1a1f2e !important;
+    border: 1px solid var(--line) !important;
+    color: #fff !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5) !important;
+}
+
+.apexcharts-tooltip-title {
+    background: var(--line) !important;
+    border-bottom: 1px solid var(--line) !important;
+    font-weight: bold !important;
+}
+
+/* 차트 내부 데이터 라벨 스타일 */
+.apexcharts-datalabel-label {
+    fill: #fff !important;
+    font-weight: 600;
+}
+
+
 /* =========================================================================
    [8] UTILITIES & STATES
    ========================================================================= */

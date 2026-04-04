@@ -261,7 +261,14 @@ header {
 
 table { width: 100%; border-collapse: collapse; font-size: 11px; }
 th { background: #1a1f2e; padding: 8px; color: var(--muted); text-align: left; position: sticky; top: 0; z-index: 10; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--text); }
 td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+#openPosTable, #historyTable { min-width: 1120px; }
+#openPosTable th, #openPosTable td,
+#historyTable th, #historyTable td { white-space: nowrap; }
+#openPosTable td:nth-child(11), #historyTable td:last-child { white-space: normal; min-width: 180px; }
+#historyTable td:nth-child(11) { min-width: 110px; }
 
 /* 수치 요약 영역 */
 .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }
@@ -308,6 +315,8 @@ button {
     font-size: 11px;
     transition: 0.2s;
 }
+
+.btn-xs { padding: 4px 8px; font-size: 10px; }
 
 .btn-blue { background: var(--accent); color: white; width: 100%; }
 .btn-green { background: #15311e; color: #4ade80; border: 1px solid #244d34; font-size: 10px; }
@@ -435,6 +444,12 @@ button {
 /* 편집 모드 하이라이트 */
 .edit-active { border: 2px solid var(--warn) !important; background: rgba(251, 191, 36, 0.05) !important; }
 .edit-active-row { background: rgba(251, 191, 36, 0.2) !important; border-left: 4px solid var(--warn) !important; }
+.history-related-row { background: rgba(59, 130, 246, 0.10) !important; }
+.history-focus-row { background: rgba(59, 130, 246, 0.16) !important; border-left: 4px solid #60a5fa !important; }
+.pill-live { color: #93c5fd; border-color: #1d4ed8; background: rgba(29, 78, 216, 0.18); }
+.pill-order { color: #fcd34d; border-color: #92400e; background: rgba(146, 64, 14, 0.18); }
+.pill-long { color: #86efac; border-color: #166534; background: rgba(22, 101, 52, 0.18); }
+.pill-short { color: #fca5a5; border-color: #991b1b; background: rgba(153, 27, 27, 0.18); }
 
 /* 싱크 상태 컬러링 */
 .sync-ok { color: var(--good); }
@@ -450,88 +465,147 @@ button {
 /* =========================================================================
    [9] RESPONSIVE (MOBILE)
    ========================================================================= */
+.mobile-only {
+    display: none;
+}
+
 @media (max-width: 768px) {
-    html, body { overflow-x: hidden; overflow-y: auto; }
+    html, body {
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
 
-    header { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; }
-    .header-left { flex-direction: column; width: 100%; }
-    
-    #fx-container { width: 100%; flex-wrap: wrap; border-radius: 8px; min-width: 0; }
-    #sync-bar { width: 100%; justify-content: space-between; margin-left: 0; display: grid; grid-template-columns: 1fr 1fr 1fr; }
+    header {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        padding: 8px 10px;
+        margin-top: 0;
+    }
 
+    /* 로그인/버튼 영역을 모바일 최상단으로 */
     .header-actions {
+        order: 1;
         width: 100%;
         align-items: stretch;
+        min-width: 0;
+    }
+
+    .header-left {
+        order: 2;
+        flex-direction: column;
+        width: 100%;
         gap: 6px;
-       min-width: 0;
+    }
+
+    .header-left h1 {
+        font-size: 13px !important;
+        line-height: 1.2;
+        margin: 0;
+    }
+
+    .mobile-only {
+        display: inline-flex;
     }
 
     .header-actions-row {
-        justify-content: flex-start;
-        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
         gap: 6px;
+        width: 100%;
+        justify-content: stretch;
     }
 
     .header-actions-row button,
     .header-actions-row .sync-auth-status {
-        flex: 1 1 calc(50% - 6px);
-        min-width: 140px;
-    }
-
-    .header-tool-single {
-        padding-top: 0;
-    }
-
-    .header-tool-group {
-        min-width: 0;
         width: 100%;
+        min-width: 0;
+        font-size: 10px;
+        padding: 6px 8px;
+        height: 30px;
+        box-sizing: border-box;
     }
 
-    .header-tool-buttons {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
+    /* 로그인 상태 / 로그인 버튼 우선 강조 */
+    #sync-auth-status {
+        grid-column: 1 / -1;
+    }
+
+    #syncAuthBtn {
+        grid-column: 1 / 2;
+    }
+
+    #toggleHeaderInfoBtn {
+    grid-column: 2 / 3;
+
+    display: flex;
+    justify-content: center;  /* 텍스트 가운데 */
+    align-items: center;
+    text-align: center;
+}
+
+    /* 모바일에서 시세/싱크 박스 기본 접기 */
+    #fx-container {
+        width: 100%;
+        min-width: 0;
+        display: none;
+        flex-direction: column;
         gap: 6px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        overflow: hidden;
     }
 
-    .header-divider {
+    /* 펼쳤을 때만 노출 */
+    #fx-container.expanded {
+        display: flex;
+    }
+
+    #sync-bar {
+        width: 100%;
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px !important;
+        margin-left: 0 !important;
+        font-size: 9px !important;
+    }
+
+    #sync-bar > div {
+        min-width: 0;
+        padding: 4px 6px;
+        border-radius: 6px;
+        background: rgba(255,255,255,0.03);
+    }
+
+    #sync-bar b,
+    #sync-bar span {
+        font-size: 9px !important;
+        line-height: 1.15;
+    }
+
+    /* 실시간 시세는 한 줄 + 가로스크롤 */
+    #fx-monitor {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        gap: 8px;
+        row-gap: 0;
+        white-space: nowrap;
+        min-width: 0;
+        flex: 1 1 auto;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    #fx-monitor::-webkit-scrollbar {
         display: none;
     }
 
-    /* 대시보드 그리드 해제 */
-    .main-grid { display: block; height: auto; }
-    .scroll-col { width: 100%; overflow: visible; margin-bottom: 16px; }
-    .tab-content { height: auto !important; overflow: visible !important; }
-
-    /* 테이블 가로 스크롤 허용 */
-    .table-wrap { overflow-x: auto; }
-    table { min-width: 850px; }
-    
-    /* 리포트 레이아웃 조정 */
-    .report-filter { flex-direction: column; align-items: stretch; }
-    .filter-item input { width: 100%; }
-    .summary-grid { grid-template-columns: repeat(2, 1fr); }
-    .master-grid { grid-template-columns: 1fr 1fr; }
-}
-
-@media (max-width: 1200px) {
-    header {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .header-left,
-    .header-actions {
-        width: 100%;
-    }
-
-    #fx-container {
-        min-width: 0;
-        flex-wrap: wrap;
-        align-items: center;
-    }
-
-    #fx-monitor {
-        flex: 1 1 100%;
+    .price-tag {
+        font-size: 10px;
+        flex: 0 0 auto;
     }
 
     .sync-info {
@@ -539,5 +613,54 @@ button {
         padding-left: 0;
         margin-left: 0;
         width: 100%;
+        font-size: 9px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .header-divider {
+        display: none;
+    }
+
+    .main-grid {
+        display: block;
+        height: auto;
+    }
+
+    .scroll-col {
+        width: 100%;
+        overflow: visible;
+        margin-bottom: 16px;
+    }
+
+    .tab-content {
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    .table-wrap {
+        overflow-x: auto;
+    }
+
+    table {
+        min-width: 850px;
+    }
+
+    .report-filter {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filter-item input {
+        width: 100%;
+    }
+
+    .summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .master-grid {
+        grid-template-columns: 1fr 1fr;
     }
 }

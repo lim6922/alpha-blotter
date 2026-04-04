@@ -22,6 +22,47 @@ let autoImportInFlight = false;
 let autoImportDoneUserId = null;
 let authAutoActionsBound = false;
 
+function applySyncAuthState(session = null, options = {}) {
+  const { keepImportState = false } = options;
+  const statusEl = document.getElementById('sync-auth-status');
+  const btnEl = document.getElementById('syncAuthBtn');
+
+  if (!statusEl) return;
+
+  const user = session?.user || null;
+
+  if (user) {
+    const email = user.email || 'Google User';
+    statusEl.innerText = `로그인됨 · ${email}`;
+    statusEl.classList.remove('sync-auth-off');
+    statusEl.classList.add('sync-auth-on');
+
+    if (btnEl) btnEl.innerText = '로그아웃';
+
+    if (autoImportDoneUserId === user.id && !autoImportInFlight) {
+      autoSyncCanRun = true;
+      maybeScheduleAutoSync();
+    } else {
+      autoSyncCanRun = false;
+    }
+
+    return;
+  }
+
+  autoSyncCanRun = false;
+
+  if (!keepImportState) {
+    autoImportDoneUserId = null;
+    autoImportFromCloudDone = false;
+  }
+
+  statusEl.innerText = '로그인 필요';
+  statusEl.classList.remove('sync-auth-on');
+  statusEl.classList.add('sync-auth-off');
+
+  if (btnEl) btnEl.innerText = '동기화 로그인';
+}
+
 function setAutoSyncStatus(text, className = '') {
   const statusEl = document.getElementById('autosync-status');
   if (!statusEl) return;
@@ -83,24 +124,26 @@ function bindAuthAutoActions() {
   if (authAutoActionsBound) return;
   authAutoActionsBound = true;
 
-  supabaseClient.auth.onAuthStateChange(async (event, session) => {
+  supabaseClient.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
       autoSyncCanRun = false;
       autoImportInFlight = false;
       autoImportDoneUserId = null;
       autoImportFromCloudDone = false;
-      await updateSyncAuthUI();
+      applySyncAuthState(null);
       return;
     }
 
     if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-      // 로그인 상태 표시는 즉시 갱신하고, import/export 자동 처리는 백그라운드로 실행
-      await updateSyncAuthUI();
-      runAutoCloudActionsForUser(session?.user || null, `auth-${event}`)
-        .catch((err) => console.error('auto cloud actions failed:', err))
-        .finally(() => {
-          updateSyncAuthUI();
-        });
+      applySyncAuthState(session, { keepImportState: true });
+
+      setTimeout(() => {
+        runAutoCloudActionsForUser(session?.user || null, `auth-${event}`)
+          .catch((err) => console.error('auto cloud actions failed:', err))
+          .finally(() => {
+            updateSyncAuthUI();
+          });
+      }, 0);
     }
   });
 }
@@ -253,6 +296,21 @@ let globalFX = parseFloat(localStorage.getItem('blotter_fx_v96')) || 1350;
 let isStealth = false;
 let editingId = null;
 let editingAsset = null;
+let historyFocusKey = null;
+const tableSortState = {
+  history: { key: 'inputOrder', dir: 'desc' },
+  report: { key: 'date', dir: 'desc' }
+};
+const tableSortLabels = {
+  history: {
+    inputOrder: '입력순', date: '일자', asset: '상품', side: '구분', price: '가격', qty: '수량',
+    status: '상태', stopLoss: '스탑', netPnlCur: '순손익(통화)', netPct: '손익률', memo: '메모'
+  },
+  report: {
+    date: '날짜', asset: '상품', side: '구분', price: '가격', qty: '수량', status: '상태',
+    realizedPnlCur: '실현손익(통화)', feeCur: '수수료(통화)', netPnlCur: '순손익(통화)', netPct: '손익률', memo: '메모'
+  }
+};
 
 /**
  * =========================
@@ -354,7 +412,12 @@ function getTimestamp() {
 
 
 
-async function updateSyncAuthUI() {
+async function updateSyncAuthUI(sessionOverride = undefined) {
+  if (sessionOverride !== undefined) {
+    applySyncAuthState(sessionOverride, { keepImportState: !sessionOverride?.user });
+    return;
+  }
+
   const statusEl = document.getElementById('sync-auth-status');
   const btnEl = document.getElementById('syncAuthBtn');
 
@@ -372,33 +435,7 @@ async function updateSyncAuthUI() {
     return;
   }
 
-  const user = data?.session?.user;
-
-  if (user) {
-    const email = user.email || 'Google User';
-    statusEl.innerText = `로그인됨 · ${email}`;
-    statusEl.classList.remove('sync-auth-off');
-    statusEl.classList.add('sync-auth-on');
-
-    if (btnEl) btnEl.innerText = '로그아웃';
-
-    if (autoImportDoneUserId === user.id && !autoImportInFlight) {
-      autoSyncCanRun = true;
-      maybeScheduleAutoSync();
-    } else {
-      autoSyncCanRun = false;
-    }
-  } else {
-    autoSyncCanRun = false;
-    autoImportDoneUserId = null;
-    autoImportFromCloudDone = false;
-
-    statusEl.innerText = '로그인 필요';
-    statusEl.classList.remove('sync-auth-on');
-    statusEl.classList.add('sync-auth-off');
-
-    if (btnEl) btnEl.innerText = '동기화 로그인';
-  }
+  applySyncAuthState(data?.session || null);
 }
 
 async function getCurrentUserOrAlert() {
@@ -1203,13 +1240,55 @@ async function syncMarketPrices() {
  * =========================
  */
 function safeNum(x, d=0){ const n=parseFloat(x); return isNaN(n)?d:n; }
+function isLongSide(side){ return side === "Buy"; }
+function sideLabel(side){ return isLongSide(side) ? "Long" : "Short"; }
+function sidePill(side){ return `<span class="pill ${isLongSide(side) ? 'pill-long' : 'pill-short'}">${sideLabel(side)}</span>`; }
+function compareSortValues(a, b) {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  return String(a).localeCompare(String(b), 'ko', { numeric: true, sensitivity: 'base' });
+}
+function sortRows(rows, tableName) {
+  const { key, dir } = tableSortState[tableName];
+  const mult = dir === 'asc' ? 1 : -1;
+  return rows.slice().sort((a, b) => {
+    const result = compareSortValues(a[key], b[key]);
+    if (result !== 0) return result * mult;
+    return compareSortValues(a.date, b.date) * -1;
+  });
+}
+function refreshSortHeaders() {
+  Object.entries(tableSortLabels).forEach(([tableName, labels]) => {
+    const state = tableSortState[tableName];
+    Object.entries(labels).forEach(([key, label]) => {
+      const el = document.getElementById(`${tableName}-sort-${key}`);
+      if (!el) return;
+      const arrow = state.key === key ? (state.dir === 'asc' ? ' ▲' : ' ▼') : '';
+      el.textContent = label + arrow;
+    });
+  });
+}
+function toggleTableSort(tableName, key) {
+  const state = tableSortState[tableName];
+  if (state.key === key) state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+  else { state.key = key; state.dir = 'asc'; }
+  if (tableName === 'history') renderAll();
+  else renderPerformanceReport();
+}
+function getTradeInputOrderMap(sourceTrades = trades) {
+  const orderMap = new Map();
+  sourceTrades.forEach((t, idx) => orderMap.set(t.id, idx + 1));
+  return orderMap;
+}
 
 function calcStopRiskKRW(t) {
   if (t.stopLoss == null || t.stopLoss === "" || isNaN(t.stopLoss)) return 0;
   const m = master[t.asset];
   if (!m) return 0;
 
-  const diff = t.side === "Buy" ? (t.price - t.stopLoss) : (t.stopLoss - t.price);
+  const diff = isLongSide(t.side) ? (t.price - t.stopLoss) : (t.stopLoss - t.price);
   if (diff <= 0) return 0;
 
   const lossPoint = (diff / m.tick) * m.tickVal * t.qty;
@@ -1247,14 +1326,14 @@ function stopToStopPct(side, curPrice, stop){
   const p = safeNum(curPrice, 0);
   const s = safeNum(stop, NaN);
   if(!p || isNaN(s)) return null;
-  if(side === "Buy") return ((p - s) / p) * 100;
+  if(isLongSide(side)) return ((p - s) / p) * 100;
   return ((s - p) / p) * 100;
 }
 
 function pnlPctForPosition(p){
   if(!p.avgPrice || !p.currPrice) return 0;
 
-  // Buy / Sell 방향 고려
+  // Long / Short 방향 고려
   const dir = (p.qty > 0) ? 1 : -1;
 
   return ((p.currPrice - p.avgPrice) / p.avgPrice) * 100 * dir;
@@ -1295,7 +1374,7 @@ function calculateEngine() {
         const matchingLot = inventory[key][0];
         const matchQty = Math.min(remain, matchingLot.qty);
 
-        const diff = (t.side === "Sell") ? (t.price - matchingLot.price) : (matchingLot.price - t.price);
+        const diff = isLongSide(t.side) ? (matchingLot.price - t.price) : (t.price - matchingLot.price);
         const pnlPoint = (diff / m.tick) * m.tickVal * matchQty;
         const pnlKRW = (m.cur === "USD") ? pnlPoint * t.fxRate : pnlPoint;
         const pnlCur = (m.cur === "USD") ? pnlPoint : pnlKRW;
@@ -1314,10 +1393,10 @@ function calculateEngine() {
     }
 
     if (remain > 0) {
-      inventory[key].push({ side: t.side, qty: remain, price: t.price, fx: t.fxRate });
+      inventory[key].push({ side: t.side, qty: remain, price: t.price, fx: t.fxRate, tradeId: t.id });
     }
 
-    const netQty = inventory[key].reduce((acc, lot) => acc + (lot.side === 'Buy' ? lot.qty : -lot.qty), 0);
+    const netQty = inventory[key].reduce((acc, lot) => acc + (isLongSide(lot.side) ? lot.qty : -lot.qty), 0);
 
     const netPnlKRW = realizedThisTradeKRW - feeThisKRW;
     const netPnlCur = realizedThisTradeCur - feeThisCur;
@@ -1361,9 +1440,9 @@ netPct = (realizedThisTradeKRW / costKRW) * 100;
     if (lots.length === 0) return;
     const [asset, maturity] = key.split('_');
     const m = master[asset];
-    const totalQty = lots.reduce((s, l) => s + (l.side === 'Buy' ? l.qty : -l.qty), 0);
+    const totalQty = lots.reduce((s, l) => s + (isLongSide(l.side) ? l.qty : -l.qty), 0);
     if (totalQty === 0) return;
-    const sameSideLots = lots.filter(l => (l.side === 'Buy') === (totalQty > 0));
+    const sameSideLots = lots.filter(l => isLongSide(l.side) === (totalQty > 0));
 const avgPrice =
   sameSideLots.reduce((s,l)=>s + l.price*l.qty,0) /
   sameSideLots.reduce((s,l)=>s + l.qty,0);
@@ -1384,11 +1463,19 @@ const moveDom = atmRecords.filter(r => r.acc === 'DOM').reduce((s, r) => s + saf
 const moveOvs = atmRecords.filter(r => r.acc === 'OVS').reduce((s, r) => s + safeNum(r.amt), 0);
 
 
+const residualTradeQtyMap = {};
+Object.values(inventory).forEach(lots => {
+  lots.forEach(lot => {
+    if (lot.tradeId == null || !lot.qty) return;
+    residualTradeQtyMap[lot.tradeId] = (residualTradeQtyMap[lot.tradeId] || 0) + lot.qty;
+  });
+});
+
 const positionOutcome = calculatePositionOutcomes(processed);
 const tradeOutcome = calculateTradeOutcomes(processed);
 
 return {
-  processed, openPos, netRealizedKRW: rKRW_Total - tFeeKRW,
+  processed, openPos, residualTradeQtyMap, netRealizedKRW: rKRW_Total - tFeeKRW,
   posWin: positionOutcome.win,
   posLoss: positionOutcome.loss,
   posWinSum: positionOutcome.winSum,
@@ -1737,87 +1824,129 @@ function getPositionMemoSummary(asset, maturity) {
 
 
 
+function updateHistoryFocusUi() {
+  const labelEl = document.getElementById('historyFocusLabel');
+  const resetBtn = document.getElementById('historyFocusResetBtn');
+  if (!labelEl || !resetBtn) return;
+
+  if (!historyFocusKey) {
+    labelEl.classList.add('hidden');
+    resetBtn.classList.add('hidden');
+    labelEl.textContent = '';
+    return;
+  }
+
+  const [asset, maturity] = historyFocusKey.split('_');
+  labelEl.textContent = (`필터: ${asset} ${maturity || ''}`).trim();
+  labelEl.classList.remove('hidden');
+  resetBtn.classList.remove('hidden');
+}
+
+function focusHistoryByPosition(positionKey) {
+  historyFocusKey = positionKey;
+  renderAll();
+  const historyTable = document.getElementById('historyTable');
+  if (historyTable) historyTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function clearHistoryFocus() {
+  historyFocusKey = null;
+  renderAll();
+}
+
 function renderTables(res, margin) {
   const openBody = document.querySelector('#openPosTable tbody');
+  const histBody = document.querySelector('#historyTable tbody');
+  const inputOrderMap = getTradeInputOrderMap();
   openBody.innerHTML = '';
-  
-  // 현재 수정 중인 거래 정보 가져오기
+  histBody.innerHTML = '';
+  updateHistoryFocusUi();
+  refreshSortHeaders();
+
   const editingTrade = editingId ? trades.find(t => t.id === editingId) : null;
   const editingKey = editingTrade ? `${editingTrade.asset}_${editingTrade.maturity}` : null;
 
-  // 1. Active Positions 테이블 렌더링
-res.openPos.forEach(p => {
-  const dte = Math.ceil((new Date(p.maturity) - new Date().setHours(0,0,0,0)) / 86400000);
-  const pnlPct = pnlPctForPosition(p);
+  res.openPos.forEach(p => {
+    const dte = Math.ceil((new Date(p.maturity) - new Date().setHours(0,0,0,0)) / 86400000);
+    const pnlPct = pnlPctForPosition(p);
+    const isRelated = (p.key === editingKey);
+    const isFocused = (p.key === historyFocusKey);
+    const memoSummary = getPositionMemoSummary(p.asset, p.maturity);
+    const residualTrades = res.processed.filter(t => `${t.asset}_${t.maturity}` === p.key && (res.residualTradeQtyMap[t.id] || 0) > 0);
+    const residualSummary = residualTrades.length > 0
+      ? residualTrades.map(t => `#${inputOrderMap.get(t.id) || '-'} ${sideLabel(t.side)} ${res.residualTradeQtyMap[t.id]}`).join(' / ')
+      : '-';
 
-  // 수정 중인 거래와 종목/만기가 같으면 강조
-  const isRelated = (p.key === editingKey);
+    const qtyDisplay = Math.abs(p.qty);
+    openBody.innerHTML += `
+      <tr class="${isRelated ? 'edit-active-row' : ''} ${isFocused ? 'history-focus-row' : ''}">
+        <td><b>${p.asset}</b><br><small style="color:var(--muted)">${p.maturity || '-'}</small></td>
+        <td>${sidePill(p.qty > 0 ? 'Buy' : 'Sell')}</td>
+        <td class="${dte <= 3 ? 'down' : ''}">${isNaN(dte) ? '-' : dte + 'd'}</td>
+        <td class="${p.qty > 0 ? 'up' : 'down'}">${qtyDisplay}</td>
+        <td>${Number(p.avgPrice).toFixed(2)}</td>
+        <td>
+          <input type="number"
+                 value="${p.currPrice}"
+                 onchange="updateMTM('${p.key}', this.value)"
+                 class="td-input-mtm">
+        </td>
+        <td>-</td>
+        <td>-</td>
+        <td class="${pnlPct >= 0 ? 'up' : 'down'}">${pnlPct.toFixed(2)}%</td>
+        <td class="${p.uPnl >= 0 ? 'up' : 'down'}">
+          ${Math.round(p.cur === "USD" ? p.uPnl * globalFX : p.uPnl).toLocaleString()}
+        </td>
+        <td class="mono" title="${memoSummary}
+잔존 lot: ${residualSummary}">${memoSummary}</td>
+        <td>
+          <button onclick="focusHistoryByPosition('${p.key}')" class="btn-outline btn-xs">관련 보기</button>
+        </td>
+      </tr>
+    `;
+  });
 
-  // ✅ 메모 요약 (여기서 계산)
-  const memoSummary = getPositionMemoSummary(p.asset, p.maturity);
+  const historyRows = res.processed.map(t => {
+    const posKey = `${t.asset}_${t.maturity}`;
+    const isSquared = !res.openPos.some(p => p.key === posKey);
+    const residualQty = res.residualTradeQtyMap[t.id] || 0;
+    const tradeStatus = t.isCloseTrade ? 'CLOSE' : 'OPEN';
+    const contributesToOpen = residualQty > 0;
+    return {
+      ...t,
+      posKey,
+      isSquared,
+      residualQty,
+      tradeStatus,
+      contributesToOpen,
+      inputOrder: inputOrderMap.get(t.id) || 0,
+      status: `${tradeStatus}_${isSquared ? 'SQUARED' : 'OPEN'}_${residualQty > 0 ? 'LIVE' : 'FLAT'}`
+    };
+  });
 
-  openBody.innerHTML += `
-    <tr class="${isRelated ? 'edit-active-row' : ''}">
-      <td><b>${p.asset}</b><br><small style="color:var(--muted)">${p.maturity || '-'}</small></td>
-      <td style="color:${p.qty > 0 ? 'var(--good)' : 'var(--bad)'}">${p.qty > 0 ? 'Buy' : 'Sell'}</td>
-      <td class="${dte <= 3 ? 'down' : ''}">${isNaN(dte) ? '-' : dte + 'd'}</td>
-      <td class="${p.qty > 0 ? 'up' : 'down'}">${p.qty}</td>
-      <td>${Number(p.avgPrice).toFixed(2)}</td>
-      <td>
-        <input type="number"
-               value="${p.currPrice}"
-               onchange="updateMTM('${p.key}', this.value)"
-               class="td-input-mtm">
-      </td>
-      <td>-</td>
-      <td>-</td>
-      <td class="${pnlPct >= 0 ? 'up' : 'down'}">${pnlPct.toFixed(2)}%</td>
-      <td class="${p.uPnl >= 0 ? 'up' : 'down'}">
-        ${Math.round(p.cur === "USD" ? p.uPnl * globalFX : p.uPnl).toLocaleString()}
-      </td>
-      <td class="mono" title="${memoSummary}">${memoSummary}</td>
-    </tr>
-  `;
-});
-
-  // 2. Trade History 테이블 렌더링
-  const histBody = document.querySelector('#historyTable tbody');
-
-  histBody.innerHTML = '';
-  res.processed.slice().reverse().forEach(t => {
-// ===== 상태 표시 (컬럼 추가 없음 / 중복 제거 버전) =====
-
-// Trade 기준 상태
-const tradeStatus = t.isCloseTrade ? 'CLOSE' : 'OPEN';
-
-// Position 기준 SQUARED 여부
-const posKey = `${t.asset}_${t.maturity}`;
-const isSquared = !res.openPos.some(p => p.key === posKey);
-
-// 잔량 힌트: CLOSE & 미종료일 때만
-const qtyHint =
-  (t.isCloseTrade && !isSquared)
-    ? `<span class="pill" style="opacity:.7">잔 ${t.currentNetQty}</span>`
-    : '';
-
-// 최종 상태 라벨
-let statusLabel = `
-  <span class="pill">${tradeStatus}</span>
-  ${isSquared
-    ? `<span class="pill up">SQUARED</span>`
-    : `<span class="pill muted">OPEN</span>`
-  }
-  ${qtyHint}
-`;
-
-    // 현재 수정 중인 행 자체를 강조
+  sortRows(historyRows, 'history').forEach(t => {
+    const qtyHint = t.contributesToOpen
+      ? `<span class="pill pill-live">잔존 ${t.residualQty}</span>`
+      : ((t.isCloseTrade && !t.isSquared) ? `<span class="pill" style="opacity:.7">포지션 진행중</span>` : '');
+    const statusLabel = `
+      <span class="pill">${t.tradeStatus}</span>
+      ${t.isSquared ? `<span class="pill up">SQUARED</span>` : `<span class="pill muted">OPEN</span>`}
+      ${qtyHint}
+    `;
     const isEditingThis = (t.id === editingId);
+    const isRelatedToFocus = (t.posKey === historyFocusKey);
+    const rowClass = [
+      isEditingThis ? 'edit-active-row' : '',
+      isRelatedToFocus ? 'history-focus-row' : '',
+      !isRelatedToFocus && t.contributesToOpen ? 'history-related-row' : ''
+    ].filter(Boolean).join(' ');
 
     histBody.innerHTML += `
-      <tr class="${isEditingThis ? 'edit-active-row' : ''}">
+      <tr class="${rowClass}">
+        <td><span class="pill pill-order">#${t.inputOrder || '-'}</span></td>
         <td>${t.date}</td>
         <td>${t.asset}</td>
-        <td class="${t.side === 'Buy' ? 'up' : 'down'}">${t.side}</td>
+        <td>${sidePill(t.side)}</td>
         <td>${t.price}</td>
         <td>${t.qty}</td>
         <td>${statusLabel}</td>
@@ -1834,9 +1963,7 @@ let statusLabel = `
           <button onclick="editTrade(${t.id})" class="btn-edit">수정</button>
           <button onclick="deleteTrade(${t.id})" class="btn-danger">삭제</button>
         </td>
-<td class="mono" title="${t.memo || '-'}">
-  ${t.memo ? t.memo : '-'}
-</td>
+        <td class="mono" title="${t.memo || '-'}">${t.memo ? t.memo : '-'}</td>
       </tr>`;
   });
 }
@@ -2426,8 +2553,14 @@ function renderPerformanceReport() {
 
   const body = document.querySelector('#repDetailTable tbody');
   body.innerHTML = '';
+  refreshSortHeaders();
 
-  filtered.forEach(t => {
+  const reportRows = sortRows(filtered.map(t => ({
+    ...t,
+    status: t.currentNetQty === 0 ? 'SQUARED' : (t.isCloseTrade ? 'CLOSE' : 'OPEN')
+  })), 'report');
+
+  reportRows.forEach(t => {
     // 1. 기본 손익/수수료 누적
     if (t.cur === "USD") {
       realizedUSD += t.realizedPnlCur;
@@ -2448,12 +2581,12 @@ function renderPerformanceReport() {
     }
 
     // 3. 테이블 행 추가
-    let statusLabel = t.currentNetQty === 0 ? 'SQUARED' : (t.isCloseTrade ? 'CLOSE' : 'OPEN');
+    const statusLabel = t.status;
     body.innerHTML += `
       <tr>
         <td>${t.date}</td>
         <td>${t.asset}</td>
-        <td class="${t.side === 'Buy' ? 'up' : 'down'}">${t.side}</td>
+        <td>${sidePill(t.side)}</td>
         <td>${t.price.toLocaleString()}</td>
         <td>${t.qty}</td>
         <td><span class="pill">${statusLabel}</span></td>
@@ -2660,5 +2793,12 @@ function getSyncStatus(local, imp, exp) {
   return 'WARN';
 }
 
+function toggleHeaderInfo() {
+  const fxContainer = document.getElementById('fx-container');
+  const toggleBtn = document.getElementById('toggleHeaderInfoBtn');
 
-//* 20260208_2121수정 *//
+  if (!fxContainer || !toggleBtn) return;
+
+  const expanded = fxContainer.classList.toggle('expanded');
+  toggleBtn.textContent = expanded ? '시세/싱크 접기' : '시세/싱크 펼치기';
+}

@@ -39,8 +39,15 @@
 <div class="header-actions">
   <div class="header-actions-row">
     <input type="file" id="csvImport" style="display:none;" onchange="importFromCSV(event)" />
+
     <span id="sync-auth-status" class="sync-auth-status sync-auth-off">로그인 필요</span>
     <button class="btn-outline btn-sync" id="syncAuthBtn" onclick="handleSyncAuth()">동기화 로그인</button>
+
+    <!-- 모바일 전용: 시세/싱크 접기/펼치기 -->
+    <button class="btn-outline btn-sync mobile-only" id="toggleHeaderInfoBtn" onclick="toggleHeaderInfo()">
+      👁️ 시세/싱크 펼치기
+    </button>
+
     <button class="btn-outline btn-sync" onclick="importFromCloud()">동기화 가져오기</button>
     <button class="btn-outline btn-sync" onclick="exportToCloud()">동기화 내보내기</button>
     <button class="btn-outline" onclick="document.getElementById('csvImport').click()">CSV 가져오기</button>
@@ -95,7 +102,7 @@
 
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
           <div><label style="font-size:10px; color:var(--muted)">체결일</label><input type="date" id="tradeDate" onchange="syncMaturityFromDTE()" /></div>
-          <div><label style="font-size:10px; color:var(--muted)">구분</label><select id="side"><option value="Buy">BUY</option><option value="Sell">SELL</option></select></div>
+          <div><label style="font-size:10px; color:var(--muted)">구분</label><select id="side"><option value="Buy">LONG</option><option value="Sell">SHORT</option></select></div>
 
           <!-- 만기일-DTE 자동 계산 영역 -->
           <div class="date-sync-grid">
@@ -169,7 +176,7 @@
             <thead>
               <tr>
                 <th>상품/만기</th><th>구분</th><th>DTE</th><th>잔고</th><th>평단가</th><th style="width:90px;">현재가</th>
-                <th>스탑</th><th>스탑까지%</th><th>PnL%</th><th>평가손익</th><th>메모</th>
+                <th>스탑</th><th>스탑까지%</th><th>PnL%</th><th>평가손익</th><th>메모</th><th>연결</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -177,13 +184,17 @@
         </div>
 
         <!-- 2-3. 개별 체결 이력 (Trade History) -->
-        <h2 style="margin-top:20px;">Trade History</h2>
+        <h2 style="margin-top:20px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span>Trade History</span>
+          <span id="historyFocusLabel" class="pill hidden"></span>
+          <button id="historyFocusResetBtn" class="btn-outline btn-xs hidden" onclick="clearHistoryFocus()">전체 보기</button>
+        </h2>
         <div class="table-wrap">
           <table id="historyTable">
             <thead>
               <tr>
-                <th>일자</th><th>상품</th><th>구분</th><th>가격</th><th>수량</th><th>상태</th>
-                <th>스탑</th><th>순손익(통화)</th><th>손익률</th><th>액션</th><th>메모</th>
+                <th id="history-sort-inputOrder" class="sortable" onclick="toggleTableSort('history', 'inputOrder')">입력순</th><th id="history-sort-date" class="sortable" onclick="toggleTableSort('history', 'date')">일자</th><th id="history-sort-asset" class="sortable" onclick="toggleTableSort('history', 'asset')">상품</th><th id="history-sort-side" class="sortable" onclick="toggleTableSort('history', 'side')">구분</th><th id="history-sort-price" class="sortable" onclick="toggleTableSort('history', 'price')">가격</th><th id="history-sort-qty" class="sortable" onclick="toggleTableSort('history', 'qty')">수량</th><th id="history-sort-status" class="sortable" onclick="toggleTableSort('history', 'status')">상태</th>
+                <th id="history-sort-stopLoss" class="sortable" onclick="toggleTableSort('history', 'stopLoss')">스탑</th><th id="history-sort-netPnlCur" class="sortable" onclick="toggleTableSort('history', 'netPnlCur')">순손익(통화)</th><th id="history-sort-netPct" class="sortable" onclick="toggleTableSort('history', 'netPct')">손익률</th><th>액션</th><th id="history-sort-memo" class="sortable" onclick="toggleTableSort('history', 'memo')">메모</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -335,8 +346,8 @@
           <table id="repDetailTable">
             <thead>
               <tr>
-                <th>날짜</th><th>상품</th><th>구분</th><th>가격</th><th>수량</th><th>상태</th>
-                <th>실현손익(통화)</th><th>수수료(통화)</th><th>순손익(통화)</th><th>손익률</th><th>메모</th>
+                <th id="report-sort-date" class="sortable" onclick="toggleTableSort('report', 'date')">날짜</th><th id="report-sort-asset" class="sortable" onclick="toggleTableSort('report', 'asset')">상품</th><th id="report-sort-side" class="sortable" onclick="toggleTableSort('report', 'side')">구분</th><th id="report-sort-price" class="sortable" onclick="toggleTableSort('report', 'price')">가격</th><th id="report-sort-qty" class="sortable" onclick="toggleTableSort('report', 'qty')">수량</th><th id="report-sort-status" class="sortable" onclick="toggleTableSort('report', 'status')">상태</th>
+                <th id="report-sort-realizedPnlCur" class="sortable" onclick="toggleTableSort('report', 'realizedPnlCur')">실현손익(통화)</th><th id="report-sort-feeCur" class="sortable" onclick="toggleTableSort('report', 'feeCur')">수수료(통화)</th><th id="report-sort-netPnlCur" class="sortable" onclick="toggleTableSort('report', 'netPnlCur')">순손익(통화)</th><th id="report-sort-netPct" class="sortable" onclick="toggleTableSort('report', 'netPct')">손익률</th><th id="report-sort-memo" class="sortable" onclick="toggleTableSort('report', 'memo')">메모</th>
               </tr>
             </thead>
             <tbody></tbody>

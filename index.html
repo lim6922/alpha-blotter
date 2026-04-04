@@ -7,6 +7,7 @@
   
   <!-- 외부 라이브러리: TradingView 차트 위젯 -->
   <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -326,6 +327,15 @@
         <div class="filter-item"><label>상품</label><select id="repAssetFilter" onchange="renderPerformanceReport()"><option value="ALL">전체 상품</option></select></div>
         <button class="btn-blue" onclick="renderPerformanceReport()" style="padding: 8px 30px; width: auto;">조회하기</button>
       </div>
+
+          <div class="card" style="margin-bottom: 20px; min-height: 480px; background: linear-gradient(180deg, #141824 0%, #0b0d12 100%);">
+      <h2 style="display: flex; justify-content: space-between;">
+        <span>📈 통합 성과 및 가격 분석 (Price & PnL Insights)</span>
+        <span style="font-size: 10px; font-weight: normal; color: var(--muted);">* 단일 상품 필터링 시 가격 추이가 더 정확합니다.</span>
+      </h2>
+      <div id="integrated-analysis-chart" style="margin-top: 15px;"></div>
+    </div>
+
 
 <div class="summary-grid">
   <!-- 1. 기간 실현손익 (수수료 차감 전) -->

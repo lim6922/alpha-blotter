@@ -21,6 +21,7 @@ let autoImportFromCloudDone = false;
 let autoImportInFlight = false;
 let autoImportDoneUserId = null;
 let authAutoActionsBound = false;
+let integratedChart = null;
 
 function applySyncAuthState(session = null, options = {}) {
   const { keepImportState = false } = options;
@@ -2541,6 +2542,17 @@ function renderPerformanceReport() {
   // 선택한 기간에 해당하는 거래만 필터링
   const filtered = processed.filter(t => (!start || t.date >= start) && (!end || t.date <= end) && (assetFilter === "ALL" || t.asset === assetFilter));
 
+
+
+    // 데이터 필터링 및 시간순 정렬 (차트용)
+  const filtered = res.processed
+    .filter(t => (!start || t.date >= start) && (!end || t.date <= end) && (assetFilter === "ALL" || t.asset === assetFilter))
+    .sort((a, b) => a.createdAt - b.createdAt);
+
+  // --- [차트 업데이트 실행] ---
+  updateIntegratedChart(filtered);
+
+  
   // --- [데이터 집계 변수] ---
   let realizedKRW = 0, realizedUSD = 0;
   let feeKRW = 0, feeUSD = 0;
@@ -2641,6 +2653,117 @@ function renderPerformanceReport() {
   document.getElementById('rep-pf').innerHTML = 
     `<span style="color:var(--text)">${tPF}</span> <span style="color:var(--muted); font-size:10px;">/</span> <span style="color:var(--accent)">${pPF}</span>`;
 }
+
+
+/**
+ * [신규] 통합 분석 차트 생성 함수
+ */
+function updateIntegratedChart(filteredTrades) {
+  if (filteredTrades.length === 0) {
+    if (integratedChart) integratedChart.destroy();
+    document.querySelector("#integrated-analysis-chart").innerHTML = "<p style='text-align:center; padding:50px; color:var(--muted);'>데이터가 없습니다.</p>";
+    return;
+  }
+
+  let cumulativePnL = 0;
+  const seriesData = filteredTrades.map((t, index) => {
+    cumulativePnL += t.netPnlKRW;
+    return {
+      x: `${t.date} (#${index + 1})`,
+      price: t.price,
+      individualPnL: Math.round(t.netPnlKRW),
+      cumulative: Math.round(cumulativePnL),
+      side: t.side,
+      asset: t.asset
+    };
+  });
+
+  const options = {
+    series: [
+      { name: '누적 수익 (KRW)', type: 'area', data: seriesData.map(d => d.cumulative) },
+      { name: '체결 가격', type: 'line', data: seriesData.map(d => d.price) }
+    ],
+    chart: {
+      height: 400,
+      type: 'line',
+      background: 'transparent',
+      toolbar: { show: true },
+      zoom: { enabled: true }
+    },
+    stroke: {
+      width: [2, 3],
+      curve: ['smooth', 'stepped'] // 가격은 계단식으로 표현하여 진입가 유지 시각화
+    },
+    colors: ['#5673ff', '#fbbf24'], // 수익(파랑), 가격(노랑)
+    fill: {
+      type: ['gradient', 'solid'],
+      gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.1, stops: [0, 90, 100] }
+    },
+    // 가격 마커 위에 개별 손익금액 표시
+    dataLabels: {
+      enabled: true,
+      enabledOnSeries: [1],
+      formatter: function (val, { dataPointIndex }) {
+        const pnl = seriesData[dataPointIndex].individualPnL;
+        if (pnl === 0) return '';
+        return (pnl > 0 ? '▲ ₩' : '▼ ₩') + (Math.abs(pnl)/10000).toFixed(1) + '만';
+      },
+      style: {
+        fontSize: '10px',
+        colors: [function({ value, dataPointIndex }) {
+          const pnl = seriesData[dataPointIndex].individualPnL;
+          return pnl >= 0 ? '#4ade80' : '#ff5c5c';
+        }]
+      },
+      offsetY: -12,
+      background: { enabled: true, foreColor: '#fff', padding: 3, borderRadius: 2, borderWidth: 0, opacity: 0.85 }
+    },
+    markers: {
+      size: 5,
+      colors: seriesData.map(d => d.side === 'Buy' ? '#4ade80' : '#ff5c5c'),
+      strokeWidth: 2,
+      hover: { size: 7 }
+    },
+    xaxis: {
+      categories: seriesData.map(d => d.x),
+      labels: { style: { colors: '#a7b0c5', fontSize: '10px' }, rotate: -45, rotateAlways: false }
+    },
+    yaxis: [
+      {
+        title: { text: '누적 수익 (KRW)', style: { color: '#5673ff', fontWeight: 600 } },
+        labels: { style: { colors: '#5673ff' }, formatter: (val) => (val / 10000).toFixed(0) + "만" }
+      },
+      {
+        opposite: true,
+        title: { text: '체결 가격', style: { color: '#fbbf24', fontWeight: 600 } },
+        labels: { style: { colors: '#fbbf24' }, formatter: (val) => val.toLocaleString() }
+      }
+    ],
+    legend: { position: 'top', horizontalAlign: 'right', labels: { colors: '#a7b0c5' } },
+    grid: { borderColor: '#2a3145', strokeDashArray: 4 },
+    tooltip: {
+      theme: 'dark',
+      shared: true,
+      y: {
+        formatter: function (val, { seriesIndex, dataPointIndex }) {
+          if (seriesIndex === 1) { // 가격 툴팁
+            const d = seriesData[dataPointIndex];
+            return `<b>${val.toLocaleString()}</b> <small>(${d.side})</small><br>거래별 손익: ₩${d.individualPnL.toLocaleString()}`;
+          }
+          return `₩${val.toLocaleString()}`;
+        }
+      }
+    }
+  };
+
+  if (integratedChart) {
+    integratedChart.updateOptions(options);
+  } else {
+    integratedChart = new ApexCharts(document.querySelector("#integrated-analysis-chart"), options);
+    integratedChart.render();
+  }
+}
+
 
 // 2. ATM 기록 관리
 function addATMRecord() {
