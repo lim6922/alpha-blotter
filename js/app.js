@@ -2675,20 +2675,58 @@ function updateIntegratedChart(filteredTrades) {
   let cumulativePnL = 0;
   const seriesData = filteredTrades.map((t, index) => {
     cumulativePnL += t.netPnlKRW;
+    const isLong = isLongSide(t.side);
+    const eventType = t.isCloseTrade ? 'close' : (isLong ? 'long-entry' : 'short-entry');
     return {
       x: `${t.date} (#${index + 1})`,
       price: t.price,
       individualPnL: Math.round(t.netPnlKRW),
+      individualPnlCur: t.netPnlCur,
       cumulative: Math.round(cumulativePnL),
       side: t.side,
-      asset: t.asset
+      asset: t.asset,
+      cur: t.cur,
+      qty: t.qty,
+      eventType,
+      eventLabel: eventType === 'close' ? '청산' : (isLong ? '롱 진입' : '숏 진입'),
+      markerLabel: eventType === 'close' ? '청산' : (isLong ? 'L' : 'S')
     };
   });
+
+  const formatTradePnlDisplay = (point) => {
+    if (!point || !point.individualPnL) return '';
+
+    const sign = point.individualPnL > 0 ? '▲' : '▼';
+    const krwText = `₩${(Math.abs(point.individualPnL) / 10000).toFixed(1)}만`;
+
+    if (point.cur === 'USD') {
+      const usdAbs = Math.abs(Number(point.individualPnlCur || 0));
+      const usdText = `$${usdAbs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      return `${sign} ${usdText} / ${krwText}`;
+    }
+
+    return `${sign} ${krwText}`;
+  };
+
+  const getPricePointSeries = (eventType) =>
+    seriesData.map((point) => (point.eventType === eventType ? point.price : null));
+
+  const getPointBySeriesIndex = (seriesIndex, dataPointIndex) => {
+    if (seriesIndex <= 1) return seriesData[dataPointIndex];
+    return seriesData[dataPointIndex];
+  };
+
+  const longEntryData = getPricePointSeries('long-entry');
+  const shortEntryData = getPricePointSeries('short-entry');
+  const closeData = getPricePointSeries('close');
 
   const options = {
     series: [
       { name: '누적 수익 (KRW)', type: 'area', data: seriesData.map(d => d.cumulative) },
-      { name: '체결 가격', type: 'line', data: seriesData.map(d => d.price) }
+      { name: '체결 가격', type: 'line', data: seriesData.map(d => d.price) },
+      { name: '롱 진입', type: 'scatter', data: longEntryData },
+      { name: '숏 진입', type: 'scatter', data: shortEntryData },
+      { name: '청산', type: 'scatter', data: closeData }
     ],
     chart: {
       height: 400,
@@ -2701,31 +2739,33 @@ function updateIntegratedChart(filteredTrades) {
       width: [2, 3],
       curve: ['smooth', 'stepline'] // 가격은 계단식으로 표현하여 진입가 유지 시각화
     },
-    colors: ['#5673ff', '#fbbf24'], // 수익(파랑), 가격(노랑)
+    colors: ['#5673ff', '#fbbf24', '#22c55e', '#ef4444', '#f97316'], // 수익, 가격, 롱, 숏, 청산
     fill: {
       type: ['gradient', 'solid'],
       gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.1, stops: [0, 90, 100] }
     },
-    // 가격 마커 위에 개별 손익금액 표시
     dataLabels: {
       enabled: true,
-      enabledOnSeries: [1],
-      formatter: function (val, { dataPointIndex }) {
-        const pnl = seriesData[dataPointIndex].individualPnL;
-        if (pnl === 0) return '';
-        return (pnl > 0 ? '▲ ₩' : '▼ ₩') + (Math.abs(pnl)/10000).toFixed(1) + '만';
+      enabledOnSeries: [2, 3, 4],
+      formatter: function (val, opts) {
+        if (val == null) return '';
+        const point = getPointBySeriesIndex(opts.seriesIndex, opts.dataPointIndex);
+        const pnlText = formatTradePnlDisplay(point);
+        if (!pnlText) return point?.markerLabel || '';
+        return `${point.markerLabel} ${pnlText}`;
       },
       style: {
         fontSize: '10px',
-        colors: seriesData.map(d => d.individualPnL >= 0 ? '#4ade80' : '#ff5c5c')
+        colors: ['#dce5ff']
       },
       offsetY: -12,
       background: { enabled: true, foreColor: '#fff', padding: 3, borderRadius: 2, borderWidth: 0, opacity: 0.85 }
     },
     markers: {
-      size: 5,
-      colors: seriesData.map(d => d.side === 'Buy' ? '#4ade80' : '#ff5c5c'),
+      size: [0, 0, 6, 6, 7],
+      shape: ['circle', 'circle', 'circle', 'circle', 'diamond'],
       strokeWidth: 2,
+      strokeColors: ['#5673ff', '#fbbf24', '#14532d', '#7f1d1d', '#7c2d12'],
       hover: { size: 7 }
     },
     xaxis: {
@@ -2750,10 +2790,18 @@ function updateIntegratedChart(filteredTrades) {
       shared: true,
       y: {
         formatter: function (val, { seriesIndex, dataPointIndex }) {
-          if (seriesIndex === 1) { // 가격 툴팁
-            const d = seriesData[dataPointIndex];
-            return `<b>${val.toLocaleString()}</b> <small>(${d.side})</small><br>거래별 손익: ₩${d.individualPnL.toLocaleString()}`;
+          const d = getPointBySeriesIndex(seriesIndex, dataPointIndex);
+
+          if (seriesIndex === 1 || seriesIndex >= 2) {
+            if (!d || val == null) return '';
+
+            const pnlText = d.cur === 'USD'
+              ? `${d.individualPnL < 0 ? '-' : ''}$${Math.abs(Number(d.individualPnlCur || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ₩${Math.abs(d.individualPnL).toLocaleString()}`
+              : `₩${d.individualPnL.toLocaleString()}`;
+
+            return `<b>${val.toLocaleString()}</b> <small>(${d.eventLabel}, ${d.side === 'Buy' ? 'Long' : 'Short'} ${d.qty}계약)</small><br>거래별 손익: ${pnlText}`;
           }
+
           return `₩${val.toLocaleString()}`;
         }
       }
