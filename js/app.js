@@ -2737,6 +2737,20 @@ function updateIntegratedChart(filteredTrades) {
     };
   });
 
+  const priceValues = seriesData.map(d => d.priceInKRW).filter(v => Number.isFinite(v));
+  const priceMin = priceValues.length ? Math.min(...priceValues) : 0;
+  const priceMax = priceValues.length ? Math.max(...priceValues) : 0;
+  const priceRange = Math.max(priceMax - priceMin, 0);
+  const adaptiveBuffer = Math.max(priceRange * 0.06, 6);
+  const bufferCap = Math.max(20, priceRange * 0.25);
+  const finalBuffer = Math.min(adaptiveBuffer, bufferCap);
+  let priceAxisMin = priceMin - finalBuffer;
+  let priceAxisMax = priceMax + finalBuffer;
+  if (priceAxisMax === priceAxisMin) {
+    priceAxisMin -= 1;
+    priceAxisMax += 1;
+  }
+
   const options = {
     series: [
       { name: '누적 수익 (KRW)', type: 'area', data: seriesData.map(d => d.cumulative) },
@@ -2781,7 +2795,7 @@ function updateIntegratedChart(filteredTrades) {
     },
     yaxis: [
       { title: { text: '누적 수익 (KRW)', style: { color: '#5673ff' } }, labels: { style: { colors: '#5673ff' }, formatter: (v) => formatKRW(v) } },
-      { opposite: true, title: { text: '체결가 (KRW 환산)', style: { color: '#fbbf24' } }, labels: { style: { colors: '#fbbf24' }, formatter: (v) => formatKRW(v) } }
+      { opposite: true, min: priceAxisMin, max: priceAxisMax, title: { text: '체결가 (KRW 환산)', style: { color: '#fbbf24' } }, labels: { style: { colors: '#fbbf24' }, formatter: (v) => formatKRW(v) } }
     ],
     grid: { borderColor: '#2a3145', strokeDashArray: 4 },
     // 고도화된 커스텀 툴팁
