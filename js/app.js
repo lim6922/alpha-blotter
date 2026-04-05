@@ -2737,27 +2737,9 @@ function updateIntegratedChart(filteredTrades) {
     };
   });
   const scatterStartIndex = 1 + assetSeries.length;
+  const longSeriesIndex = scatterStartIndex;
+  const shortSeriesIndex = scatterStartIndex + 1;
   const closeSeriesIndex = scatterStartIndex + 2;
-  const entryAnnotations = seriesData
-    .filter((point) => point.eventType === 'long-entry' || point.eventType === 'short-entry')
-    .map((point) => ({
-      x: point.x,
-      y: point.priceInKRW,
-      marker: {
-        size: 0
-      },
-      label: {
-        borderColor: 'transparent',
-        offsetY: point.eventType === 'long-entry' ? 10 : -10,
-        style: {
-          background: 'transparent',
-          color: point.eventType === 'long-entry' ? '#22c55e' : '#ef4444',
-          fontSize: '18px',
-          fontWeight: 700
-        },
-        text: point.eventType === 'long-entry' ? '▲' : '▼'
-      }
-    }));
   const priceValues = seriesData.map(d => d.priceInKRW).filter(v => Number.isFinite(v));
   const priceMin = priceValues.length ? Math.min(...priceValues) : 0;
   const priceMax = priceValues.length ? Math.max(...priceValues) : 0;
@@ -2804,7 +2786,15 @@ function updateIntegratedChart(filteredTrades) {
       fontSize: '12px',
       itemMargin: { horizontal: 12, vertical: 8 },
       labels: { colors: '#a7b0c5' },
-      markers: { radius: 12 }
+      markers: {
+        radius: 12,
+        customHTML: function({ seriesIndex }) {
+          if (seriesIndex === longSeriesIndex) return '<span style="color:#22c55e;font-size:14px;line-height:1;">▲</span>';
+          if (seriesIndex === shortSeriesIndex) return '<span style="color:#ef4444;font-size:14px;line-height:1;">▼</span>';
+          if (seriesIndex === closeSeriesIndex) return '<span style="color:#facc15;font-size:14px;line-height:1;">★</span>';
+          return '';
+        }
+      }
     },
     markers: { 
       size: [0, ...assetSeries.map(() => 0), 0, 0, 8], 
@@ -2819,28 +2809,25 @@ function updateIntegratedChart(filteredTrades) {
     },
     dataLabels: {
       enabled: true,
-      enabledOnSeries: [closeSeriesIndex],
+      enabledOnSeries: [longSeriesIndex, shortSeriesIndex],
       formatter: function(val, opts) {
         const point = seriesData[opts.dataPointIndex];
-        if (!point || point.eventType !== 'close') return '';
-        const pnl = point.individualPnL || 0;
-        const sign = pnl >= 0 ? '+' : '-';
-        return `${sign}${formatKRW(Math.abs(pnl))}`;
+        if (!point) return '';
+        if (opts.seriesIndex === longSeriesIndex && point.eventType === 'long-entry') return '▲';
+        if (opts.seriesIndex === shortSeriesIndex && point.eventType === 'short-entry') return '▼';
+        return '';
       },
-      offsetY: -28,
+      offsetY: 0,
       style: {
-        colors: ['#111111'],
-        fontSize: '11px',
+        colors: [function(opts) {
+          if (opts.seriesIndex === longSeriesIndex) return '#22c55e';
+          if (opts.seriesIndex === shortSeriesIndex) return '#ef4444';
+          return '#111111';
+        }],
+        fontSize: '12px',
         fontWeight: '600'
       },
-      background: {
-        enabled: true,
-        foreColor: '#111111',
-        backColor: '#facc15',
-        borderRadius: 4,
-        padding: 5,
-        opacity: 0.95
-      }
+      background: { enabled: false }
     },
     xaxis: { 
       categories: seriesData.map(d => d.x), 
@@ -2851,9 +2838,6 @@ function updateIntegratedChart(filteredTrades) {
       { opposite: true, min: priceAxisMin, max: priceAxisMax, title: { text: '체결가 (KRW / USD)', style: { color: '#fbbf24' } }, labels: { style: { colors: '#fbbf24' }, formatter: (v) => `${formatKRW(v)} / ${formatUSD(v / fxRate)}` } }
     ],
     grid: { borderColor: '#2a3145', strokeDashArray: 4 },
-    annotations: {
-      points: entryAnnotations
-    },
     // 고도화된 커스텀 툴팁
     tooltip: {
       theme: 'dark',
@@ -2883,10 +2867,13 @@ function updateIntegratedChart(filteredTrades) {
               // 청산 시점의 복기 내용 구성
               const entrySide = d.side === 'Buy' ? 'Short' : 'Long';
               const pnlColor = d.individualPnL >= 0 ? 'var(--good)' : 'var(--bad)';
+              const pnlDisplay = d.cur === 'USD'
+                ? `${formatUSD(d.individualPnlCur)} / ${formatKRW(d.individualPnL)}`
+                : `${formatKRW(d.individualPnL)} / ${formatUSD(d.individualPnL / fxRate)}`;
               html += `<div style="line-height:1.4;">
                 <span style="font-size:10px; opacity:0.7;">(${entrySide}) ${d.matchedEntryPrice.toFixed(2)} 진입</span><br>
                 <span>→ (${d.side === 'Buy' ? 'Long' : 'Short'}) ${d.price.toFixed(2)} 청산</span><br>
-                <span style="color:${pnlColor}; font-size:11px; font-weight:800;">손익: ${d.cur === 'USD' ? formatUSD(d.individualPnlCur) : formatKRW(d.individualPnL)}</span>
+                <span style="color:${pnlColor}; font-size:11px; font-weight:800;">손익: ${pnlDisplay}</span>
               </div>`;
             } else {
               html += `${d.side} ${d.qty}qty @ ${d.price.toFixed(2)}`;
