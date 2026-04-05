@@ -2736,11 +2736,20 @@ function updateIntegratedChart(filteredTrades) {
       data: seriesData.map(d => (`${d.asset}__${d.cur}` === assetKey ? d.priceInKRW : null))
     };
   });
+  const assetPalette = ['#fbbf24', '#0ea5e9', '#f97316', '#a855f7', '#10b981', '#38bdf8', '#fb7185'];
   const scatterStartIndex = 1 + assetSeries.length;
   const longSeriesIndex = scatterStartIndex;
   const shortSeriesIndex = scatterStartIndex + 1;
   const closeProfitSeriesIndex = scatterStartIndex + 2;
   const closeLossSeriesIndex = scatterStartIndex + 3;
+  const chartColors = [
+    '#5673ff',
+    ...assetSeries.map((_, idx) => assetPalette[idx % assetPalette.length]),
+    '#22c55e',
+    '#ef4444',
+    '#facc15',
+    '#f87171'
+  ];
   const priceValues = seriesData.map(d => d.priceInKRW).filter(v => Number.isFinite(v));
   const priceMin = priceValues.length ? Math.min(...priceValues) : 0;
   const priceMax = priceValues.length ? Math.max(...priceValues) : 0;
@@ -2772,7 +2781,7 @@ function updateIntegratedChart(filteredTrades) {
       zoom: { enabled: true },
       events: {}
     },
-    colors: ['#5673ff', '#fbbf24', '#0ea5e9', '#f97316', '#22c55e', '#ef4444', '#facc15', '#f87171'],
+    colors: chartColors,
     stroke: {
       width: [2, ...assetSeries.map(() => 3), 0, 0, 0, 0],
       curve: ['smooth', ...assetSeries.map(() => 'stepline'), 'straight', 'straight', 'straight', 'straight']
@@ -2802,34 +2811,36 @@ function updateIntegratedChart(filteredTrades) {
           return `<span style="color:#ef4444;font-weight:700;">▼</span> ${seriesName}`;
         }
         if (seriesIndex === closeProfitSeriesIndex) {
-          return `<span style="color:#facc15;font-weight:700;">★</span> ${seriesName}`;
+          return `<span style="color:#facc15;font-weight:700;">+</span> ${seriesName}`;
         }
         if (seriesIndex === closeLossSeriesIndex) {
-          return `<span style="color:#f87171;font-weight:700;">★</span> ${seriesName}`;
+          return `<span style="color:#f87171;font-weight:700;">-</span> ${seriesName}`;
         }
         return seriesName;
       }
     },
     markers: { 
-      size: [0, ...assetSeries.map(() => 0), 0, 0, 8, 8], 
+      size: [0, ...assetSeries.map(() => 0), 0, 0, 0, 0], 
       shape: [
         'circle', 
         ...assetSeries.map(() => 'circle'), 
         'circle',
         'circle',
-        'star',
-        'star'
+        'circle',
+        'circle'
       ],
       strokeWidth: 2
     },
     dataLabels: {
       enabled: true,
-      enabledOnSeries: [longSeriesIndex, shortSeriesIndex],
+      enabledOnSeries: [longSeriesIndex, shortSeriesIndex, closeProfitSeriesIndex, closeLossSeriesIndex],
       formatter: function(val, opts) {
         const point = seriesData[opts.dataPointIndex];
         if (!point) return '';
         if (opts.seriesIndex === longSeriesIndex && point.eventType === 'long-entry') return '▲';
         if (opts.seriesIndex === shortSeriesIndex && point.eventType === 'short-entry') return '▼';
+        if (opts.seriesIndex === closeProfitSeriesIndex && point.eventType === 'close' && point.individualPnL >= 0) return '+';
+        if (opts.seriesIndex === closeLossSeriesIndex && point.eventType === 'close' && point.individualPnL < 0) return '-';
         return '';
       },
       offsetY: 0,
@@ -2837,10 +2848,12 @@ function updateIntegratedChart(filteredTrades) {
         colors: [function(opts) {
           if (opts.seriesIndex === longSeriesIndex) return '#22c55e';
           if (opts.seriesIndex === shortSeriesIndex) return '#ef4444';
+          if (opts.seriesIndex === closeProfitSeriesIndex) return '#facc15';
+          if (opts.seriesIndex === closeLossSeriesIndex) return '#f87171';
           return '#111111';
         }],
-        fontSize: '12px',
-        fontWeight: '600'
+        fontSize: '14px',
+        fontWeight: '700'
       },
       background: { enabled: false }
     },
