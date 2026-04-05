@@ -2790,8 +2790,8 @@ function updateIntegratedChart(filteredTrades) {
       shape: [
         'circle', 
         ...assetSeries.map(() => 'circle'), 
-        'path://M0 -6L6 4H-6Z',        // long arrow pointing up
-        'path://M0 6L6 -4H-6Z',        // short arrow pointing down
+        'path://M0 -6L4 6H-4Z',        // long triangle
+        'path://M0 6L4 -6H-4Z',        // short triangle
         'star'
       ],
       strokeWidth: 2
@@ -2802,17 +2802,17 @@ function updateIntegratedChart(filteredTrades) {
       formatter: function(val, opts) {
         const point = seriesData[opts.dataPointIndex];
         if (!point || point.eventType !== 'close') return '';
-        const shortPnL = point.individualPnL || 0;
-        const sign = shortPnL >= 0 ? '+' : '-';
-        const absVal = Math.abs(shortPnL);
-        return `${sign}${formatKRW(absVal)}`;
+        const pnl = point.individualPnL || 0;
+        const sign = pnl >= 0 ? '+' : '-';
+        return `${sign}${formatKRW(Math.abs(pnl))}`;
       },
+      offsetY: -28,
       style: {
         colors: ['#111'],
-        fontSize: '10px',
+        fontSize: '11px',
         fontWeight: '600'
       },
-      background: { enabled: true, foreColor: '#111', borderRadius: 3, padding: 4, opacity: 0.9 }
+      background: { enabled: true, foreColor: '#111', backColor: '#facc15', borderRadius: 4, padding: 5, opacity: 0.95 }
     },
     xaxis: { 
       categories: seriesData.map(d => d.x), 
