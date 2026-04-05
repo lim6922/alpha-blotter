@@ -2736,6 +2736,8 @@ function updateIntegratedChart(filteredTrades) {
       data: seriesData.map(d => (`${d.asset}__${d.cur}` === assetKey ? d.priceInKRW : null))
     };
   });
+  const scatterStartIndex = 1 + assetSeries.length;
+  const closeSeriesIndex = scatterStartIndex + 2;
   const priceValues = seriesData.map(d => d.priceInKRW).filter(v => Number.isFinite(v));
   const priceMin = priceValues.length ? Math.min(...priceValues) : 0;
   const priceMax = priceValues.length ? Math.max(...priceValues) : 0;
@@ -2793,6 +2795,24 @@ function updateIntegratedChart(filteredTrades) {
         'star'
       ],
       strokeWidth: 2
+    },
+    dataLabels: {
+      enabled: true,
+      enabledOnSeries: [closeSeriesIndex],
+      formatter: function(val, opts) {
+        const point = seriesData[opts.dataPointIndex];
+        if (!point || point.eventType !== 'close') return '';
+        const shortPnL = point.individualPnL || 0;
+        const sign = shortPnL >= 0 ? '+' : '-';
+        const absVal = Math.abs(shortPnL);
+        return `${sign}${formatKRW(absVal)}`;
+      },
+      style: {
+        colors: ['#111'],
+        fontSize: '10px',
+        fontWeight: '600'
+      },
+      background: { enabled: true, foreColor: '#111', borderRadius: 3, padding: 4, opacity: 0.9 }
     },
     xaxis: { 
       categories: seriesData.map(d => d.x), 
