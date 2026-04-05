@@ -274,22 +274,30 @@ function fmtTime(ts) {
  *  - "PCT"  : 국내파생(비율)    -> init/maint는 "%", multiplier(승수) 필요
  */
 const DEFAULT_MASTER = {
-  "USDKRW": { symbol:"FX_IDC:USDKRW", ySymbol:"KRW=X", tick:0.1, tickVal:1000, fee:1000, cur:"KRW",
-              marginType:"PCT", initMargin:4.15, maintMargin:2.77, multiplier:10000, desc:"국내형(비율)" },
+  "USDKRW": {
+    symbol: "FX_IDC:USDKRW", ySymbol: "KRW=X", tick: 0.1, tickVal: 1000, fee: 1000, cur: "KRW",
+    marginType: "PCT", initMargin: 4.15, maintMargin: 2.77, multiplier: 10000, desc: "국내형(비율)"
+  },
 
-  "MES":    { symbol:"SPX500", ySymbol:"MES=F", tick:0.25, tickVal:1.25, fee:1.0, cur:"USD",
-              marginType:"FIXED", initMargin:1600, maintMargin:1450, multiplier:0, desc:"해외형(고정액)" },
+  "MES": {
+    symbol: "SPX500", ySymbol: "MES=F", tick: 0.25, tickVal: 1.25, fee: 1.0, cur: "USD",
+    marginType: "FIXED", initMargin: 1600, maintMargin: 1450, multiplier: 0, desc: "해외형(고정액)"
+  },
 
-  "MNQ":    { symbol:"VANTAGE:NAS100", ySymbol:"MNQ=F", tick:0.25, tickVal:0.5,  fee:1.0, cur:"USD",
-              marginType:"FIXED", initMargin:2200, maintMargin:2000, multiplier:0, desc:"해외형(고정액)" },
+  "MNQ": {
+    symbol: "VANTAGE:NAS100", ySymbol: "MNQ=F", tick: 0.25, tickVal: 0.5, fee: 1.0, cur: "USD",
+    marginType: "FIXED", initMargin: 2200, maintMargin: 2000, multiplier: 0, desc: "해외형(고정액)"
+  },
 
-  "MCL":    { symbol:"TVC:USOIL",      ySymbol:"MCL=F", tick:0.01, tickVal:1.0,  fee:1.5, cur:"USD",
-              marginType:"FIXED", initMargin:1200, maintMargin:1100, multiplier:0, desc:"해외형(고정액)" }
+  "MCL": {
+    symbol: "TVC:USOIL", ySymbol: "MCL=F", tick: 0.01, tickVal: 1.0, fee: 1.5, cur: "USD",
+    marginType: "FIXED", initMargin: 1200, maintMargin: 1100, multiplier: 0, desc: "해외형(고정액)"
+  }
 };
 
-let master   = JSON.parse(localStorage.getItem('blotter_master_v96')) || DEFAULT_MASTER;
-let trades   = JSON.parse(localStorage.getItem('blotter_trades_v96'))  || [];
-let capitals = JSON.parse(localStorage.getItem('blotter_capitals_v96'))|| { dom: 0, ovs: 0 };
+let master = JSON.parse(localStorage.getItem('blotter_master_v96')) || DEFAULT_MASTER;
+let trades = JSON.parse(localStorage.getItem('blotter_trades_v96')) || [];
+let capitals = JSON.parse(localStorage.getItem('blotter_capitals_v96')) || { dom: 0, ovs: 0 };
 let atmRecords = JSON.parse(localStorage.getItem('blotter_atm_v96')) || []; // ATM 기록 추가
 let mtmPrices = JSON.parse(localStorage.getItem('blotter_mtm_v96')) || {};
 let globalFX = parseFloat(localStorage.getItem('blotter_fx_v96')) || 1350;
@@ -354,7 +362,7 @@ function openTab(evt, tabName) {
     }
     renderPerformanceReport();
   }
-  
+
   if (tabName === 'tab-settings') {
     renderATM(); // 입출금 내역 갱신
   }
@@ -384,7 +392,7 @@ function loadCapitals() {
 function syncMaturityFromDTE() {
   const tradeDateStr = document.getElementById('tradeDate').value;
   const dteVal = parseInt(document.getElementById('dteInput').value);
-  if(!tradeDateStr || isNaN(dteVal)) return;
+  if (!tradeDateStr || isNaN(dteVal)) return;
   const tradeDate = new Date(tradeDateStr);
   tradeDate.setDate(tradeDate.getDate() + dteVal);
   document.getElementById('maturityDate').value = tradeDate.toISOString().split('T')[0];
@@ -392,7 +400,7 @@ function syncMaturityFromDTE() {
 function syncDTEFromMaturity() {
   const d1 = new Date(document.getElementById('tradeDate').value);
   const d2 = new Date(document.getElementById('maturityDate').value);
-  if(!isNaN(d1) && !isNaN(d2)) {
+  if (!isNaN(d1) && !isNaN(d2)) {
     document.getElementById('dteInput').value = Math.ceil((d2 - d1) / 86400000);
   }
 }
@@ -498,21 +506,21 @@ async function isAllowedEmail(email) {
 function buildCSVSnapshot() {
   let csv = "---META---\nLAST_LOCAL_INPUT_AT\n";
   csv += `${blotterMeta.lastLocalInputAt || ""}\n\n`;
-	
+
   csv += "---TRADES---\nDate,Asset,Maturity,Side,Price,Qty,FXRate,StopLoss,Memo,CreatedAt,UpdatedAt\n";
   trades.forEach(t => {
     const memo = (t.memo || "")
       .replace(/\r?\n/g, "\\n")
-      .replace(/"/g,'""');
+      .replace(/"/g, '""');
     csv += `${t.date},${t.asset},${t.maturity},${t.side},${t.price},${t.qty},${t.fxRate},${t.stopLoss ?? ""},"${memo}",${t.createdAt},${t.updatedAt}\n`;
   });
 
   csv += "\n---MASTER---\nAsset,Symbol,YSymbol,Tick,TickVal,Fee,Cur,MarginType,InitMargin,MaintMargin,Multiplier,Desc\n";
   Object.keys(master).forEach(k => {
     const m = master[k];
-    csv += `${k},${m.symbol||""},${m.ySymbol||""},${m.tick},${m.tickVal},${m.fee},${m.cur},${m.marginType||"FIXED"},${m.initMargin||0},${m.maintMargin||0},${m.multiplier||0},"${(m.desc||"")
-      .replace(/\r?\n/g,"\\n")
-      .replace(/"/g,'""')}"\n`;
+    csv += `${k},${m.symbol || ""},${m.ySymbol || ""},${m.tick},${m.tickVal},${m.fee},${m.cur},${m.marginType || "FIXED"},${m.initMargin || 0},${m.maintMargin || 0},${m.multiplier || 0},"${(m.desc || "")
+      .replace(/\r?\n/g, "\\n")
+      .replace(/"/g, '""')}"\n`;
   });
 
   csv += "\n---ATM---\nDate,Account,Amount,Memo\n";
@@ -526,7 +534,7 @@ function buildCSVSnapshot() {
   csv += "\n---CAPITALS---\nDOM_KRW,OVS_USD\n";
   csv += `${capitals.dom},${capitals.ovs}\n`;
 
-    return csv;
+  return csv;
 }
 
 function downloadCSV(csv, fileName) {
@@ -567,8 +575,8 @@ function parseAndApplyCSV(text, sourceLabel = "CSV") {
     if (tr === "---CAPITALS---") { currentSection = "CAPITALS"; return; }
 
     if (tr.startsWith("Date,Asset,") || tr.startsWith("Asset,Symbol,") ||
-        tr.startsWith("Date,Account,") || tr.startsWith("DOM_KRW,") ||
-        tr === "LAST_LOCAL_INPUT_AT") return;
+      tr.startsWith("Date,Account,") || tr.startsWith("DOM_KRW,") ||
+      tr === "LAST_LOCAL_INPUT_AT") return;
 
     if (currentSection === "META") {
       csvLocalInputAt = parseInt(tr, 10) || null;
@@ -1122,7 +1130,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
  */
 async function fetchYahooPrice(ySymbol) {
   const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ySymbol}?interval=1m&range=1d&_seed=${Date.now()}`;
-  
+
   // 1순위 프록시: corsproxy.io
   try {
     const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
@@ -1163,7 +1171,7 @@ async function syncMarketPrices() {
   // ySymbol이 설정된 모든 상품 추출
   const assetKeys = Object.keys(master).filter(id => master[id] && master[id].ySymbol);
   let updatedCount = 0;
-  let htmlBuffer = ""; 
+  let htmlBuffer = "";
 
   try {
     for (const id of assetKeys) {
@@ -1189,11 +1197,11 @@ async function syncMarketPrices() {
         // [실패] 시세 획득 실패 시에도 티커는 표시
         const prevPrice = mtmPrices[`LAST_${id}`];
         const displayPrice = prevPrice ? Number(prevPrice).toFixed(2) : "---";
-        
+
         // 실패 상태 표시 (회색/반투명)
         htmlBuffer += `<span class="price-tag" style="color:var(--muted); opacity:0.6;" title="시세 갱신 실패">${id} ${displayPrice}</span>`;
       }
-      
+
       // 요청 간격 (안정성)
       await sleep(100);
     }
@@ -1208,23 +1216,23 @@ async function syncMarketPrices() {
     res.openPos.forEach(p => {
       const last = mtmPrices[`LAST_${p.asset}`];
       if (last != null) {
-        mtmPrices[p.key] = last; 
+        mtmPrices[p.key] = last;
       }
     });
 
     localStorage.setItem('blotter_mtm_v96', JSON.stringify(mtmPrices));
-    
+
     // 현재 선택 상품 입력창 자동 완성
     const currentAsset = document.getElementById('asset').value;
     if (mtmPrices[`LAST_${currentAsset}`]) {
-        document.getElementById('price').value = mtmPrices[`LAST_${currentAsset}`];
+      document.getElementById('price').value = mtmPrices[`LAST_${currentAsset}`];
     }
 
     const now = new Date().toLocaleTimeString();
     syncDisplay.innerText = updatedCount === assetKeys.length ? `전체 갱신: ${now}` : `일부 갱신 (${updatedCount}/${assetKeys.length}): ${now}`;
-    
-    renderAll(); 
-    runCalc();   
+
+    renderAll();
+    runCalc();
 
   } catch (error) {
     console.error("동기화 중 오류:", error);
@@ -1240,10 +1248,10 @@ async function syncMarketPrices() {
  * Risk / Margin helpers
  * =========================
  */
-function safeNum(x, d=0){ const n=parseFloat(x); return isNaN(n)?d:n; }
-function isLongSide(side){ return side === "Buy"; }
-function sideLabel(side){ return isLongSide(side) ? "Long" : "Short"; }
-function sidePill(side){ return `<span class="pill ${isLongSide(side) ? 'pill-long' : 'pill-short'}">${sideLabel(side)}</span>`; }
+function safeNum(x, d = 0) { const n = parseFloat(x); return isNaN(n) ? d : n; }
+function isLongSide(side) { return side === "Buy"; }
+function sideLabel(side) { return isLongSide(side) ? "Long" : "Short"; }
+function sidePill(side) { return `<span class="pill ${isLongSide(side) ? 'pill-long' : 'pill-short'}">${sideLabel(side)}</span>`; }
 function compareSortValues(a, b) {
   if (a == null && b == null) return 0;
   if (a == null) return 1;
@@ -1296,25 +1304,25 @@ function calcStopRiskKRW(t) {
   return m.cur === "USD" ? lossPoint * t.fxRate : lossPoint;
 }
 
-function marginPerContractKRW(assetId, price, useInit=true){
+function marginPerContractKRW(assetId, price, useInit = true) {
   const m = master[assetId];
-  if(!m) return 0;
-  if(m.marginType === "FIXED"){
+  if (!m) return 0;
+  if (m.marginType === "FIXED") {
     const amt = useInit ? (m.initMargin || 0) : (m.maintMargin || 0);
     return m.cur === "USD" ? amt * globalFX : amt;
   }
   // PCT
   const pct = useInit ? (m.initMargin || 0) : (m.maintMargin || 0);
   const mult = m.multiplier || 0;
-  if(!price || !mult || !pct) return 0;
+  if (!price || !mult || !pct) return 0;
   return price * mult * (pct / 100);
 }
 
-function marginPerContractUSD(assetId, price, useInit=true){
+function marginPerContractUSD(assetId, price, useInit = true) {
   const m = master[assetId];
-  if(!m) return 0;
-  if(m.cur !== "USD") return 0;
-  if(m.marginType === "FIXED"){
+  if (!m) return 0;
+  if (m.cur !== "USD") return 0;
+  if (m.marginType === "FIXED") {
     return useInit ? (m.initMargin || 0) : (m.maintMargin || 0);
   }
   // PCT
@@ -1323,16 +1331,16 @@ function marginPerContractUSD(assetId, price, useInit=true){
 }
 
 
-function stopToStopPct(side, curPrice, stop){
+function stopToStopPct(side, curPrice, stop) {
   const p = safeNum(curPrice, 0);
   const s = safeNum(stop, NaN);
-  if(!p || isNaN(s)) return null;
-  if(isLongSide(side)) return ((p - s) / p) * 100;
+  if (!p || isNaN(s)) return null;
+  if (isLongSide(side)) return ((p - s) / p) * 100;
   return ((s - p) / p) * 100;
 }
 
-function pnlPctForPosition(p){
-  if(!p.avgPrice || !p.currPrice) return 0;
+function pnlPctForPosition(p) {
+  if (!p.avgPrice || !p.currPrice) return 0;
 
   // Long / Short 방향 고려
   const dir = (p.qty > 0) ? 1 : -1;
@@ -1349,7 +1357,7 @@ function pnlPctForPosition(p){
 function calculateEngine() {
 
   const sorted = [...trades].sort((a, b) => new Date(a.date) - new Date(b.date));
-  const inventory = {}; 
+  const inventory = {};
 
   let rKRW_Total = 0, rKRW_Dom = 0, rUSD_Ovs = 0;
   let tFeeKRW = 0, feeKRW_Dom = 0, feeUSD_Ovs = 0;
@@ -1370,7 +1378,12 @@ function calculateEngine() {
     let realizedThisTradeCur = 0;
     let totalMatchValue = 0; // 수익률 계산용 매입원가 합계
 
-    if (inventory[key].length > 0 && inventory[key][0].side !== t.side) {
+
+
+if (inventory[key].length > 0 && inventory[key][0].side !== t.side) {
+      let totalMatchPriceForThisTrade = 0; // 진입가 추적용
+      let totalMatchQtyForThisTrade = 0;
+      
       while (remain > 0 && inventory[key].length > 0) {
         const matchingLot = inventory[key][0];
         const matchQty = Math.min(remain, matchingLot.qty);
@@ -1380,17 +1393,29 @@ function calculateEngine() {
         const pnlKRW = (m.cur === "USD") ? pnlPoint * t.fxRate : pnlPoint;
         const pnlCur = (m.cur === "USD") ? pnlPoint : pnlKRW;
 
+
+
         realizedThisTradeKRW += pnlKRW;
         realizedThisTradeCur += pnlCur;
         totalMatchValue += (matchingLot.price * matchQty); // 원가 누적
+        
+        totalMatchPriceForThisTrade += (matchingLot.price * matchQty); // 진입가 합계
+        totalMatchQtyForThisTrade += matchQty; // 매칭 수량 합계
+
         rKRW_Total += pnlKRW;
         
+        
+
+
+
         if (m.cur === "KRW") rKRW_Dom += pnlKRW; else rUSD_Ovs += pnlPoint;
 
         matchingLot.qty -= matchQty;
         remain -= matchQty;
         if (matchingLot.qty <= 0) inventory[key].shift();
       }
+      // 해당 체결이 청산시킨 평균 진입가 계산
+      t.matchedEntryPrice = totalMatchPriceForThisTrade / totalMatchQtyForThisTrade;
     }
 
     if (remain > 0) {
@@ -1410,14 +1435,14 @@ function calculateEngine() {
       // 점수 기준 수익률 계산
       const realizedPoint = realizedThisTradeKRW / (m.cur === "USD" ? t.fxRate : 1);
       const costKRW = (m.cur === "USD"
-  ? avgMatchPrice * matchQtyTotal * m.tickVal / m.tick * t.fxRate
-  : avgMatchPrice * matchQtyTotal * m.tickVal / m.tick);
+        ? avgMatchPrice * matchQtyTotal * m.tickVal / m.tick * t.fxRate
+        : avgMatchPrice * matchQtyTotal * m.tickVal / m.tick);
 
-netPct = (realizedThisTradeKRW / costKRW) * 100;
+      netPct = (realizedThisTradeKRW / costKRW) * 100;
     }
 
     // 체결 성과 평가는 실현손익(수수료 제외) 기준으로 별도 집계합니다.
-	  
+
     return {
       ...t,
       cur: m.cur || "KRW",
@@ -1444,56 +1469,56 @@ netPct = (realizedThisTradeKRW / costKRW) * 100;
     const totalQty = lots.reduce((s, l) => s + (isLongSide(l.side) ? l.qty : -l.qty), 0);
     if (totalQty === 0) return;
     const sameSideLots = lots.filter(l => isLongSide(l.side) === (totalQty > 0));
-const avgPrice =
-  sameSideLots.reduce((s,l)=>s + l.price*l.qty,0) /
-  sameSideLots.reduce((s,l)=>s + l.qty,0);
+    const avgPrice =
+      sameSideLots.reduce((s, l) => s + l.price * l.qty, 0) /
+      sameSideLots.reduce((s, l) => s + l.qty, 0);
     const currPrice =
-  (mtmPrices[key] != null)
-    ? mtmPrices[key]
-    : (mtmPrices[`LAST_${asset}`] != null
-        ? mtmPrices[`LAST_${asset}`]
-        : avgPrice);
+      (mtmPrices[key] != null)
+        ? mtmPrices[key]
+        : (mtmPrices[`LAST_${asset}`] != null
+          ? mtmPrices[`LAST_${asset}`]
+          : avgPrice);
     const uPnlPoint = (currPrice - avgPrice) * (totalQty > 0 ? 1 : -1) * (1 / m.tick) * m.tickVal * Math.abs(totalQty);
     if (m.cur === "USD") { unrealizedKRW += uPnlPoint * globalFX; uOvsPoint += uPnlPoint; }
     else { unrealizedKRW += uPnlPoint; uDom += uPnlPoint; }
     openPos.push({ key, asset, maturity, qty: totalQty, avgPrice, currPrice, uPnl: uPnlPoint, cur: m.cur });
   });
 
-// calculateEngine 함수 내부에 삽입
-const moveDom = atmRecords.filter(r => r.acc === 'DOM').reduce((s, r) => s + safeNum(r.amt), 0);
-const moveOvs = atmRecords.filter(r => r.acc === 'OVS').reduce((s, r) => s + safeNum(r.amt), 0);
+  // calculateEngine 함수 내부에 삽입
+  const moveDom = atmRecords.filter(r => r.acc === 'DOM').reduce((s, r) => s + safeNum(r.amt), 0);
+  const moveOvs = atmRecords.filter(r => r.acc === 'OVS').reduce((s, r) => s + safeNum(r.amt), 0);
 
 
-const residualTradeQtyMap = {};
-Object.values(inventory).forEach(lots => {
-  lots.forEach(lot => {
-    if (lot.tradeId == null || !lot.qty) return;
-    residualTradeQtyMap[lot.tradeId] = (residualTradeQtyMap[lot.tradeId] || 0) + lot.qty;
+  const residualTradeQtyMap = {};
+  Object.values(inventory).forEach(lots => {
+    lots.forEach(lot => {
+      if (lot.tradeId == null || !lot.qty) return;
+      residualTradeQtyMap[lot.tradeId] = (residualTradeQtyMap[lot.tradeId] || 0) + lot.qty;
+    });
   });
-});
 
-const positionOutcome = calculatePositionOutcomes(processed);
-const tradeOutcome = calculateTradeOutcomes(processed);
+  const positionOutcome = calculatePositionOutcomes(processed);
+  const tradeOutcome = calculateTradeOutcomes(processed);
 
-return {
-  processed, openPos, residualTradeQtyMap, netRealizedKRW: rKRW_Total - tFeeKRW,
-  posWin: positionOutcome.win,
-  posLoss: positionOutcome.loss,
-  posWinSum: positionOutcome.winSum,
-  posLossSum: positionOutcome.lossSum,
-  posTotal: positionOutcome.total,
+  return {
+    processed, openPos, residualTradeQtyMap, netRealizedKRW: rKRW_Total - tFeeKRW,
+    posWin: positionOutcome.win,
+    posLoss: positionOutcome.loss,
+    posWinSum: positionOutcome.winSum,
+    posLossSum: positionOutcome.lossSum,
+    posTotal: positionOutcome.total,
 
-  rKRW_Dom, rUSD_Ovs, unrealizedKRW, feeKRW_Dom, feeUSD_Ovs,
-  tradeWin: tradeOutcome.win,
-  tradeLoss: tradeOutcome.loss,
-  tradeNeutral: tradeOutcome.neutral,
-  tradeWinSum: tradeOutcome.winSum,
-  tradeLossSum: tradeOutcome.lossSum,
-  tradeTotal: tradeOutcome.total,
-  // 수정된 부분: 초기자본(capitals) + 입출금누계(move) + 매매손익
-  eqDom: capitals.dom + moveDom + rKRW_Dom + uDom - feeKRW_Dom,
-  eqOvs: capitals.ovs + moveOvs + rUSD_Ovs + uOvsPoint - feeUSD_Ovs
-};
+    rKRW_Dom, rUSD_Ovs, unrealizedKRW, feeKRW_Dom, feeUSD_Ovs,
+    tradeWin: tradeOutcome.win,
+    tradeLoss: tradeOutcome.loss,
+    tradeNeutral: tradeOutcome.neutral,
+    tradeWinSum: tradeOutcome.winSum,
+    tradeLossSum: tradeOutcome.lossSum,
+    tradeTotal: tradeOutcome.total,
+    // 수정된 부분: 초기자본(capitals) + 입출금누계(move) + 매매손익
+    eqDom: capitals.dom + moveDom + rKRW_Dom + uDom - feeKRW_Dom,
+    eqOvs: capitals.ovs + moveOvs + rUSD_Ovs + uOvsPoint - feeUSD_Ovs
+  };
 }
 
 
@@ -1574,7 +1599,7 @@ function calculateStopRiskSummary(res) {
 function calculateMarginSummary(res) {
   // 전체 순자산(Equity) 계산
   const equityTotalKRW = res.eqDom + (res.eqOvs * globalFX);
-  
+
   let usedKRW_byKRW = 0, usedUSD_byUSD = 0;
 
   res.openPos.forEach(p => {
@@ -1593,17 +1618,17 @@ function calculateMarginSummary(res) {
 
   const maintUsedKRW = usedKRW_byKRW + (usedUSD_byUSD * globalFX);
   const maintRatio = equityTotalKRW > 0 ? maintUsedKRW / equityTotalKRW : 0;
-  
+
   let status = "SAFE", color = "var(--good)";
   if (maintRatio > 0.8) { status = "⚠️ TIGHT"; color = "var(--warn)"; }
   if (maintRatio > 0.95) { status = "🚨 DANGER"; color = "var(--bad)"; }
 
-  return { 
-    usedKRW_byKRW, 
-    usedUSD_byUSD, 
-    maintUsedKRW, 
-    maintRatio, 
-    status, 
+  return {
+    usedKRW_byKRW,
+    usedUSD_byUSD,
+    maintUsedKRW,
+    maintRatio,
+    status,
     color,
     // 수정: 각 통화별 여유금은 해당 통화 Equity에서 직접 차감
     freeKRW: res.eqDom - usedKRW_byKRW,
@@ -1672,12 +1697,12 @@ function renderAll() {
   document.getElementById('equity-dom').innerText = Math.round(res.eqDom).toLocaleString();
   document.getElementById('equity-ovs').innerText = "$" + res.eqOvs.toLocaleString(undefined, { minimumFractionDigits: 2 });
   document.getElementById('equity-total-krw-side').innerText = Math.round(equityTotalKRW).toLocaleString();
-  
+
   // 리스크 지표 표시
   document.getElementById('stop-risk-krw-side').innerText = Math.round(risk.totalStopRiskKRW).toLocaleString() + " KRW";
   document.getElementById('risk-ratio').innerText = (risk.riskRatio * 100).toFixed(1) + "%";
   document.getElementById('margin-alert-side').innerHTML = `<span style="color:${margin.color}; font-weight:bold">${margin.status}</span>`;
-  
+
   // 증거금 여유 표시
   document.getElementById('free-krw').innerText = Math.round(margin.freeKRW).toLocaleString() + " KRW";
   document.getElementById('free-usd').innerText = "$" + (margin.freeUSD).toLocaleString(undefined, { minimumFractionDigits: 2 });
@@ -1747,7 +1772,7 @@ function renderAll() {
   document.getElementById('maint-used-usd').innerText = "$" + margin.usedUSD_byUSD.toFixed(2);
   document.getElementById('maint-free-krw').innerText = Math.round(margin.freeKRW).toLocaleString() + " KRW";
   document.getElementById('maint-free-usd').innerText = "$" + margin.freeUSD.toFixed(2);
-  
+
   const maintRatioKRW = (res.eqDom > 0) ? (margin.usedKRW_byKRW / res.eqDom) : 0;
   const maintRatioUSD = (res.eqOvs > 0) ? (margin.usedUSD_byUSD / res.eqOvs) : 0;
   document.getElementById('maint-ratio-krw').innerText = (maintRatioKRW * 100).toFixed(1) + "%";
@@ -1758,7 +1783,7 @@ function renderAll() {
   document.getElementById('avail-cash-krw').innerText = Math.round(availCashKRW).toLocaleString() + " KRW";
   document.getElementById('avail-cash-usd').innerText = "$" + availCashUSD.toLocaleString(undefined, { minimumFractionDigits: 2 });
 
-// --- [6] 퍼포먼스 요약 텍스트 업데이트 ---
+  // --- [6] 퍼포먼스 요약 텍스트 업데이트 ---
   document.getElementById('perf-summary').innerHTML = `
     <!-- [첫 번째 칸] 통화별 실현 내역 및 수수료 (가독성 강화) -->
     <div>
@@ -1783,16 +1808,14 @@ function renderAll() {
     <div>
       <span style="color:var(--muted)">포지션 승률 / PF</span><br>
       <b style="font-size:12px;">${res.posTotal}회 /
-      ${
-        res.posTotal > 0
-          ? ((res.posWin / res.posTotal) * 100).toFixed(1)
-          : "0.0"
-      }%</b><br>
-      <span style="font-size:11px; color:var(--accent);">PF ${
-        res.posLossSum > 0
-          ? (res.posWinSum / res.posLossSum).toFixed(2)
-          : (res.posWinSum > 0 ? "∞" : "0.00")
-      }</span>
+      ${res.posTotal > 0
+      ? ((res.posWin / res.posTotal) * 100).toFixed(1)
+      : "0.0"
+    }%</b><br>
+      <span style="font-size:11px; color:var(--accent);">PF ${res.posLossSum > 0
+      ? (res.posWinSum / res.posLossSum).toFixed(2)
+      : (res.posWinSum > 0 ? "∞" : "0.00")
+    }</span>
     </div>
   `;
 
@@ -1868,7 +1891,7 @@ function renderTables(res, margin) {
   const editingKey = editingTrade ? `${editingTrade.asset}_${editingTrade.maturity}` : null;
 
   res.openPos.forEach(p => {
-    const dte = Math.ceil((new Date(p.maturity) - new Date().setHours(0,0,0,0)) / 86400000);
+    const dte = Math.ceil((new Date(p.maturity) - new Date().setHours(0, 0, 0, 0)) / 86400000);
     const pnlPct = pnlPctForPosition(p);
     const isRelated = (p.key === editingKey);
     const isFocused = (p.key === historyFocusKey);
@@ -1952,13 +1975,12 @@ function renderTables(res, margin) {
         <td>${t.qty}</td>
         <td>${statusLabel}</td>
         <td>${t.stopLoss ?? '-'}</td>
-        <td class="${t.netPnlCur >= 0 ? 'up' : 'down'}">${
-          t.netPnlCur !== 0
-            ? (t.cur === "USD"
-                ? "$" + t.netPnlCur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                : Math.round(t.netPnlCur).toLocaleString())
-            : '-'
-        }</td>
+        <td class="${t.netPnlCur >= 0 ? 'up' : 'down'}">${t.netPnlCur !== 0
+        ? (t.cur === "USD"
+          ? "$" + t.netPnlCur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : Math.round(t.netPnlCur).toLocaleString())
+        : '-'
+      }</td>
         <td class="${t.netPct >= 0 ? 'up' : 'down'}">${t.netPct !== 0 ? t.netPct.toFixed(2) + '%' : '-'}</td>
         <td>
           <button onclick="editTrade(${t.id})" class="btn-edit">수정</button>
@@ -2034,15 +2056,15 @@ function addOrUpdateTrade() {
     trades.push(t);
   }
 
-localStorage.setItem('blotter_trades_v96', JSON.stringify(trades));
+  localStorage.setItem('blotter_trades_v96', JSON.stringify(trades));
 
-// ✅ 업데이트 버튼을 눌렀다는 "의미적 완료 시점"
-blotterMeta.lastLocalInputAt = Date.now();
-saveMeta();
-updateSyncHeader();
+  // ✅ 업데이트 버튼을 눌렀다는 "의미적 완료 시점"
+  blotterMeta.lastLocalInputAt = Date.now();
+  saveMeta();
+  updateSyncHeader();
 
-// UI 정리는 그 다음
-cancelEdit();
+  // UI 정리는 그 다음
+  cancelEdit();
 
 }
 
@@ -2075,7 +2097,7 @@ function editTrade(id) {
   document.getElementById('memoInput').value = t.memo || "";
 
   syncDTEFromMaturity();
-  
+
   // 테이블 하이라이트 갱신을 위해 재호출
   renderAll();
 
@@ -2085,7 +2107,7 @@ function editTrade(id) {
 
 function cancelEdit() {
   editingId = null;
-  
+
   // UI 원복
   document.getElementById('inputCard').classList.remove('edit-active');
   document.getElementById('inputTitle').innerText = "체결 입력";
@@ -2101,7 +2123,7 @@ function cancelEdit() {
   document.getElementById('dteInput').value = "";
   document.getElementById('tradeDate').value = new Date().toISOString().split('T')[0];
   document.getElementById('maturityDate').value = new Date().toISOString().split('T')[0];
-  
+
   // 하이라이트 제거를 위해 갱신
   renderAll();
 }
@@ -2113,7 +2135,7 @@ function cancelEdit() {
 function renderMaster() {
   const container = document.getElementById('master-list');
   const calcSelect = document.getElementById('calc-asset');
-  if(!container) return;
+  if (!container) return;
   container.innerHTML = ''; calcSelect.innerHTML = '';
 
   Object.keys(master).forEach(k => {
@@ -2122,7 +2144,7 @@ function renderMaster() {
     const marginHint = (m.marginType === "PCT")
       ? `PCT | 위탁 ${m.initMargin}% / 유지 ${m.maintMargin}% | 승수 ${m.multiplier}`
       : `FIXED | 위탁 ${m.initMargin}(${m.cur}) / 유지 ${m.maintMargin}(${m.cur})`;
-    
+
     container.innerHTML += `
       <div class="master-item ${isEditing ? 'edit-active-item' : ''}" style="border-bottom:1px solid var(--line); padding:8px 0;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -2146,7 +2168,7 @@ function editAsset(id) {
   const m = master[id];
   if (!m) return;
 
-  editingAsset = id; 
+  editingAsset = id;
 
   // UI 상태 변경
   document.getElementById('masterInputCard').classList.add('edit-active');
@@ -2168,7 +2190,7 @@ function editAsset(id) {
   document.getElementById('newTickVal').value = m.tickVal || 0;
   document.getElementById('newDesc').value = m.desc || "";
 
-  renderMaster(); 
+  renderMaster();
 
   // 수정창으로 스크롤 이동
   document.getElementById('masterInputCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2200,17 +2222,17 @@ function addOrUpdateAsset() {
   if (editingAsset && editingAsset !== id) {
     delete master[editingAsset];
   }
-  
+
   master[id] = m;
   localStorage.setItem('blotter_master_v96', JSON.stringify(master));
 
 
   blotterMeta.lastLocalInputAt = Date.now();
-saveMeta();
-updateSyncHeader();
+  saveMeta();
+  updateSyncHeader();
 
   alert(editingAsset ? "수정되었습니다." : "추가되었습니다.");
-  
+
   clearAssetForm(); // 여기서 UI 초기화 및 노란 테두리 제거가 실행됨
   initAssetSelect();
   onAssetChange();
@@ -2280,13 +2302,13 @@ function clearAssetForm() {
  */
 function clearInputs() {
   const fields = [
-    'newAsset', 'newSymbol', 'newYSymbol', 'newInitMargin', 
-    'newMaintMargin', 'newMultiplier', 'newFee', 'newTick', 
+    'newAsset', 'newSymbol', 'newYSymbol', 'newInitMargin',
+    'newMaintMargin', 'newMultiplier', 'newFee', 'newTick',
     'newTickVal', 'newDesc'
   ];
   fields.forEach(id => {
     const el = document.getElementById(id);
-    if(el) el.value = "";
+    if (el) el.value = "";
   });
   document.getElementById('newCur').value = "USD";
   document.getElementById('newMarginType').value = "FIXED";
@@ -2300,13 +2322,13 @@ function removeAsset(id) {
   initAssetSelect();
   renderAll();
 
-blotterMeta.lastLocalInputAt = Date.now();
-saveMeta();
-updateSyncHeader();
+  blotterMeta.lastLocalInputAt = Date.now();
+  saveMeta();
+  updateSyncHeader();
 }
 
-function updateM(a,f,v) {
-  const numFields = new Set(["tick","tickVal","fee","initMargin","maintMargin","multiplier"]);
+function updateM(a, f, v) {
+  const numFields = new Set(["tick", "tickVal", "fee", "initMargin", "maintMargin", "multiplier"]);
   master[a][f] = numFields.has(f) ? parseFloat(v) : v;
   localStorage.setItem('blotter_master_v96', JSON.stringify(master));
   onAssetChange();
@@ -2350,7 +2372,7 @@ function updateTVChart() {
 
   // 기존 위젯이 있다면 제거 (메모리 관리)
   const container = document.getElementById('fx-chart-mini');
-  container.innerHTML = ""; 
+  container.innerHTML = "";
 
   tvWidget = new TradingView.widget({
     "autosize": true,
@@ -2378,18 +2400,18 @@ function onAssetChange() {
   if (!m) return;
 
   document.getElementById('fxRate').value = (m.cur === "KRW") ? 1 : Number(globalFX).toFixed(2);
-  
+
   // --- [추가된 로직]: 상품 변경 시 저장된 최신 시세가 있다면 체결가 칸에 입력 ---
   if (mtmPrices[`LAST_${assetId}`]) {
-      document.getElementById('price').value = mtmPrices[`LAST_${assetId}`];
+    document.getElementById('price').value = mtmPrices[`LAST_${assetId}`];
   } else {
-      document.getElementById('price').value = ""; // 시세가 없으면 비움
+    document.getElementById('price').value = ""; // 시세가 없으면 비움
   }
   // ----------------------------------------------------------------------
 
   updateTVChart();
   runCalc();
-  renderAll(); 
+  renderAll();
 }
 
 function updateMTM(k, v) {
@@ -2413,7 +2435,7 @@ function runCalc() {
   const valPerPointKRW = (m.cur === "USD") ? (valPerPointUSD * globalFX) : valPerPointUSD;
 
   document.getElementById('calc-result').innerHTML =
-    `수익: <b>${m.cur === "USD" ? "$" : "₩"}${valUSD.toLocaleString(undefined, {minimumFractionDigits: 2})} / ₩${valKRW.toLocaleString(undefined, {maximumFractionDigits:0})}</b>` +
+    `수익: <b>${m.cur === "USD" ? "$" : "₩"}${valUSD.toLocaleString(undefined, { minimumFractionDigits: 2 })} / ₩${valKRW.toLocaleString(undefined, { maximumFractionDigits: 0 })}</b>` +
     `<br><span style="color:var(--accent)">1포인트(1.0) 가치: ${m.cur === "USD" ? "$" + valPerPointUSD.toFixed(1) : ""} (약 ₩${Math.round(valPerPointKRW).toLocaleString()})</span>`;
 }
 
@@ -2444,14 +2466,14 @@ function clearAllData() {
  * Additional buyable contracts
  * =========================
  */
-function updateAvailContracts(res=null, margin=null){
+function updateAvailContracts(res = null, margin = null) {
   // compute with latest snapshot if not passed
-  if(!res) res = calculateEngine();
-  if(!margin) margin = calculateMarginSummary(res);
+  if (!res) res = calculateEngine();
+  if (!margin) margin = calculateMarginSummary(res);
 
   const assetId = document.getElementById('asset').value;
   const m = master[assetId];
-  if(!m) return;
+  if (!m) return;
 
   const priceInput = safeNum(document.getElementById('price').value, 0);
   const refPrice = priceInput || mtmPrices[`${assetId}_${document.getElementById('maturityDate').value}`] || 0;
@@ -2472,12 +2494,12 @@ function updateAvailContracts(res=null, margin=null){
 
   // pill (asset currency 기준 우선)
   let pillText = "추가매수: -";
-  if(m.cur === "KRW") pillText = `추가매수: ${availKRW} (KRW)`;
+  if (m.cur === "KRW") pillText = `추가매수: ${availKRW} (KRW)`;
   else pillText = `추가매수: ${availUSD} (USD)`;
   document.getElementById('availContractsPill').innerText = pillText;
 }
 
-function updateAvailContractsOnPrice(){ // on price input
+function updateAvailContractsOnPrice() { // on price input
   renderAll();
 }
 
@@ -2553,7 +2575,7 @@ function renderPerformanceReport() {
   // --- [차트 업데이트 실행] ---
   updateIntegratedChart(filtered);
 
-  
+
   // --- [데이터 집계 변수] ---
   let realizedKRW = 0, realizedUSD = 0;
   let feeKRW = 0, feeUSD = 0;
@@ -2613,7 +2635,7 @@ function renderPerformanceReport() {
   });
 
   // --- [최종 성과 지표 계산] ---
-  
+
   // 체결 기준 승률/PF
   const tTotal = filtered.length;
   const tWinRate = tTotal > 0 ? ((tWin / tTotal) * 100).toFixed(1) : "0.0";
@@ -2646,267 +2668,163 @@ function renderPerformanceReport() {
   if (repFeeBreakdown) repFeeBreakdown.innerText = "₩" + Math.round(feeKRW).toLocaleString() + " / $" + feeUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const repNetBreakdown = document.getElementById('rep-net-breakdown');
   if (repNetBreakdown) repNetBreakdown.innerText = "₩" + Math.round(netKRW).toLocaleString() + " / $" + netUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  
+
   // 승률 표시 (체결 / 포지션)
-  document.getElementById('rep-winrate').innerHTML = 
+  document.getElementById('rep-winrate').innerHTML =
     `<span style="color:var(--text)">${tWinRate}%</span> <span style="color:var(--muted); font-size:10px;">/</span> <span style="color:var(--accent)">${pWinRate}%</span>`;
-  
+
   // PF 표시 (체결 / 포지션)
-  document.getElementById('rep-pf').innerHTML = 
+  document.getElementById('rep-pf').innerHTML =
     `<span style="color:var(--text)">${tPF}</span> <span style="color:var(--muted); font-size:10px;">/</span> <span style="color:var(--accent)">${pPF}</span>`;
 }
 
 
 /**
- * [신규] 통합 분석 차트 생성 함수
+ * [최종 점검 완료] 통합 분석 차트 생성 및 업데이트
  */
 function updateIntegratedChart(filteredTrades) {
   const chartEl = document.querySelector("#integrated-analysis-chart");
   if (!chartEl) return;
 
   if (typeof ApexCharts === 'undefined') {
-    chartEl.innerHTML = "<p style='text-align:center; padding:50px; color:var(--bad);'>차트 라이브러리를 불러오지 못했습니다.</p>";
+    chartEl.innerHTML = "<p>차트 라이브러리 로드 실패</p>";
     return;
   }
 
   if (filteredTrades.length === 0) {
-    if (integratedChart) {
-      integratedChart.destroy();
-      integratedChart = null;
-    }
+    if (integratedChart) { integratedChart.destroy(); integratedChart = null; }
     chartEl.innerHTML = "<p style='text-align:center; padding:50px; color:var(--muted);'>데이터가 없습니다.</p>";
     return;
   }
 
   const fxRate = Number.isFinite(globalFX) && globalFX > 0 ? globalFX : 1350;
-  const formatKRW = (value) => `₩${Math.round(Number(value) || 0).toLocaleString()}`;
-  const formatUSD = (value) => `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatKRW = (v) => `₩${Math.round(v).toLocaleString()}`;
+  const formatUSD = (v) => `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  let cumulativePnL = 0;
+  // 1. 데이터 가공 (중복 선언 제거됨)
+  let cumulative = 0;
   const seriesData = filteredTrades.map((t, index) => {
-    cumulativePnL += t.netPnlKRW;
+    cumulative += t.netPnlKRW;
     const isLong = isLongSide(t.side);
     const eventType = t.isCloseTrade ? 'close' : (isLong ? 'long-entry' : 'short-entry');
-    const rawPrice = Number(t.price);
-    const price = Number.isFinite(rawPrice) ? rawPrice : 0;
-    const priceInKRW = t.cur === 'USD' ? price * fxRate : price;
+    const priceInKRW = t.cur === 'USD' ? t.price * fxRate : t.price;
+
     return {
       x: `#${t.inputOrder || (index + 1)} ${t.date}`,
-      price,
-      priceInKRW,
-      individualPnL: Math.round(t.netPnlKRW),
+      price: t.price,
+      priceInKRW: priceInKRW,
+      matchedEntryPrice: t.matchedEntryPrice || null, 
+      individualPnL: t.netPnlKRW,
       individualPnlCur: t.netPnlCur,
-      cumulative: Math.round(cumulativePnL),
+      cumulative: Math.round(cumulative),
       side: t.side,
       asset: t.asset,
-      inputOrder: t.inputOrder || (index + 1),
       cur: t.cur,
       qty: t.qty,
-      eventType,
-      eventLabel: eventType === 'close' ? '청산' : (isLong ? '롱 진입' : '숏 진입'),
-      markerLabel: eventType === 'close' ? '청산' : (isLong ? 'L' : 'S')
+      eventType: eventType,
+      eventLabel: eventType === 'close' ? '청산' : (isLong ? '롱 진입' : '숏 진입')
     };
   });
 
-  const priceValues = seriesData.map((point) => Number(point.priceInKRW)).filter((val) => Number.isFinite(val));
-  const priceMin = priceValues.length ? Math.min(...priceValues) : 0;
-  const priceMax = priceValues.length ? Math.max(...priceValues) : 0;
-  const priceRange = Math.max(priceMax - priceMin, 0);
-  const buffer = Math.max(priceRange * 0.12, Math.abs(priceMax) * 0.03, 1);
-  let priceAxisMin = priceMin - buffer;
-  let priceAxisMax = priceMax + buffer;
-  if (priceAxisMin === priceAxisMax) {
-    priceAxisMin -= 1;
-    priceAxisMax += 1;
-  }
-
-  const uniqueAssets = [...new Set(seriesData.map((d) => `${d.asset || '기타'}__${d.cur || 'KRW'}`))];
-  const assetSeriesMap = uniqueAssets.reduce((acc, assetKey) => {
-    acc[assetKey] = new Array(seriesData.length).fill(null);
-    return acc;
-  }, {});
-  seriesData.forEach((point, idx) => {
-    const assetKey = `${point.asset || '기타'}__${point.cur || 'KRW'}`;
-    assetSeriesMap[assetKey][idx] = point.priceInKRW;
+  // 2. 자산별 가격 라인 생성
+  const uniqueAssets = [...new Set(seriesData.map((d) => `${d.asset}__${d.cur}`))];
+  const assetSeries = uniqueAssets.map((assetKey) => {
+    const assetName = assetKey.split('__')[0];
+    return {
+      name: `${assetName} 가격`,
+      type: 'line',
+      data: seriesData.map(d => (`${d.asset}__${d.cur}` === assetKey ? d.priceInKRW : null))
+    };
   });
 
-  const pricePalette = ['#fbbf24', '#0ea5e9', '#f97316', '#a855f7', '#10b981', '#f472b6', '#38bdf8'];
-  const priceSeriesColors = uniqueAssets.map((_, assetIdx) => pricePalette[assetIdx % pricePalette.length]);
-  const priceSeries = uniqueAssets.map((assetKey) => ({
-    name: `${assetKey.replace('__', ' ')} 가격`,
-    type: 'line',
-    data: assetSeriesMap[assetKey]
-  }));
-
-  const formatTradePnlDisplay = (point) => {
-    if (!point || !point.individualPnL) return '';
-
-    const sign = point.individualPnL > 0 ? '+' : '-';
-    const krwText = formatKRW(Math.abs(point.individualPnL));
-
-    if (point.cur === 'USD') {
-      const usdAbs = Math.abs(Number(point.individualPnlCur || 0));
-      const usdText = formatUSD(usdAbs);
-      return `${sign} ${usdText} / ${krwText}`;
-    }
-
-    return `${sign} ${krwText}`;
-  };
-
-  const formatTradeLabel = (point) => {
-    if (!point || point.eventType !== 'close') return '';
-    const pnlText = formatTradePnlDisplay(point);
-    return pnlText ? `청산 ${pnlText}` : '청산';
-  };
-
-  const getPricePointSeries = (eventType) =>
-    seriesData.map((point) => (point.eventType === eventType ? point.priceInKRW : null));
-
-  const getPointBySeriesIndex = (seriesIndex, dataPointIndex) => seriesData[dataPointIndex];
-
-  const longEntryData = getPricePointSeries('long-entry');
-  const shortEntryData = getPricePointSeries('short-entry');
-  const closeData = getPricePointSeries('close');
-
-  const scatterSeries = [
-    { name: '롱 진입', type: 'scatter', data: longEntryData },
-    { name: '숏 진입', type: 'scatter', data: shortEntryData },
-    { name: '청산', type: 'scatter', data: closeData }
-  ];
-
-  const scatterStartIndex = 1 + priceSeries.length;
-  const closeSeriesIndex = scatterStartIndex + 2;
-  const optionsSeries = [
-    { name: '누적 수익 (KRW)', type: 'area', data: seriesData.map(d => d.cumulative) },
-    ...priceSeries,
-    ...scatterSeries
-  ];
-  const seriesColors = ['#5673ff', ...priceSeriesColors, '#22c55e', '#ef4444', '#facc15'];
-  const strokeWidths = [
-    2,
-    ...priceSeries.map(() => 3),
-    ...Array(scatterSeries.length).fill(0)
-  ];
-  const strokeCurves = [
-    'smooth',
-    ...priceSeries.map(() => 'stepline'),
-    ...Array(scatterSeries.length).fill('straight')
-  ];
-  const markerSizes = [0, ...priceSeries.map(() => 0), 6, 6, 7];
-  const markerShapes = [
-    'circle',
-    ...priceSeries.map(() => 'circle'),
-    'circle',
-    'circle',
-    'star'
-  ];
-  const markerStrokeColors = [
-    '#5673ff',
-    ...priceSeriesColors,
-    '#14532d',
-    '#7f1d1d',
-    '#d97706'
-  ];
-
-  const formatPriceAxisLabel = (val) => {
-    if (val == null || !isFinite(val)) return '';
-    return formatKRW(val);
-  };
-
-  const formatPriceDisplay = (point) => {
-    if (!point) return '';
-    return point.cur === 'USD'
-      ? `${formatUSD(point.price)} / ${formatKRW(point.priceInKRW)}`
-      : formatKRW(point.price);
-  };
-
   const options = {
-    series: optionsSeries,
+    series: [
+      { name: '누적 수익 (KRW)', type: 'area', data: seriesData.map(d => d.cumulative) },
+      ...assetSeries,
+      { name: '롱 진입', type: 'scatter', data: seriesData.map(d => d.eventType === 'long-entry' ? d.priceInKRW : null) },
+      { name: '숏 진입', type: 'scatter', data: seriesData.map(d => d.eventType === 'short-entry' ? d.priceInKRW : null) },
+      { name: '청산', type: 'scatter', data: seriesData.map(d => d.eventType === 'close' ? d.priceInKRW : null) }
+    ],
     chart: {
-      height: 420,
+      height: 500, // 차트 높이 확대
       type: 'line',
       background: 'transparent',
       toolbar: { show: true },
       zoom: { enabled: true }
     },
+    colors: ['#5673ff', '#fbbf24', '#0ea5e9', '#f97316', '#22c55e', '#ef4444', '#facc15'],
     stroke: {
-      width: strokeWidths,
-      curve: strokeCurves // 가격은 계단식으로 표현하여 진입가 유지 시각화
+      width: [2, ...assetSeries.map(() => 3), 0, 0, 0],
+      curve: ['smooth', ...assetSeries.map(() => 'stepline'), 'straight', 'straight', 'straight']
     },
-    colors: seriesColors,
     fill: {
-      type: ['gradient', ...Array(priceSeries.length + scatterSeries.length).fill('solid')],
-      gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.1, stops: [0, 90, 100] }
+      type: ['gradient', ...Array(assetSeries.length + 4).fill('solid')],
+      gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05, stops: [0, 90, 100] }
     },
-    dataLabels: {
-      enabled: true,
-      enabledOnSeries: [closeSeriesIndex],
-      formatter: function (val, opts) {
-        const point = getPointBySeriesIndex(opts.seriesIndex, opts.dataPointIndex);
-        return formatTradeLabel(point);
-      },
-      style: {
-        fontSize: '10px',
-        colors: ['#dce5ff']
-      },
-      offsetY: -12,
-      background: { enabled: true, foreColor: '#fff', padding: 4, borderRadius: 4, borderWidth: 0, opacity: 0.9 }
+    // 범례 Horizon 설정
+    legend: {
+      position: 'top',
+      horizontalAlign: 'center',
+      fontSize: '12px',
+      itemMargin: { horizontal: 12, vertical: 8 },
+      labels: { colors: '#a7b0c5' },
+      markers: { radius: 12 }
     },
-    markers: {
-      size: markerSizes,
-      shape: markerShapes,
-      strokeWidth: 2,
-      strokeColors: markerStrokeColors,
-      hover: { size: 7 }
+    markers: { 
+      size: [0, ...assetSeries.map(() => 0), 6, 6, 8], 
+      shape: [...Array(assetSeries.length + 3).fill('circle'), 'star'],
+      strokeWidth: 2
     },
-    xaxis: {
-      categories: seriesData.map(d => d.x),
-      tickAmount: Math.min(8, Math.max(4, seriesData.length - 1)),
-      labels: {
-        hideOverlappingLabels: true,
-        trim: true,
-        style: { colors: '#a7b0c5', fontSize: '10px' },
-        rotate: -35,
-        rotateAlways: false
-      }
+    xaxis: { 
+      categories: seriesData.map(d => d.x), 
+      labels: { style: { colors: '#a7b0c5', fontSize: '10px' }, rotate: -35 } 
     },
     yaxis: [
-      {
-        title: { text: '누적 수익 (KRW)', style: { color: '#5673ff', fontWeight: 600 } },
-        labels: { style: { colors: '#5673ff' }, formatter: (val) => formatKRW(val) }
-      },
-      {
-        opposite: true,
-        min: priceAxisMin,
-        max: priceAxisMax,
-        forceNiceScale: true,
-        title: { text: '체결 가격 (KRW 환산)', style: { color: '#fbbf24', fontWeight: 600 } },
-        labels: { style: { colors: '#fbbf24' }, formatter: formatPriceAxisLabel }
-      }
+      { title: { text: '누적 수익 (KRW)', style: { color: '#5673ff' } }, labels: { style: { colors: '#5673ff' }, formatter: (v) => formatKRW(v) } },
+      { opposite: true, title: { text: '체결가 (KRW 환산)', style: { color: '#fbbf24' } }, labels: { style: { colors: '#fbbf24' }, formatter: (v) => formatKRW(v) } }
     ],
-    legend: { position: 'top', horizontalAlign: 'center', offsetY: -10, labels: { colors: '#a7b0c5' } },
     grid: { borderColor: '#2a3145', strokeDashArray: 4 },
+    // 고도화된 커스텀 툴팁
     tooltip: {
       theme: 'dark',
       shared: true,
-      y: {
-        formatter: function (val, { seriesIndex, dataPointIndex }) {
-          const d = getPointBySeriesIndex(seriesIndex, dataPointIndex);
+      custom: function({ series, seriesIndex, dataPointIndex, w }) {
+        const d = seriesData[dataPointIndex];
+        let html = `<div class="apexcharts-tooltip-title">${d.x}</div>`;
+        
+        w.config.series.forEach((s, idx) => {
+          const val = series[idx][dataPointIndex];
+          if (val === null || val === undefined) return;
+          const color = w.config.colors[idx];
+          
+          html += `<div class="apexcharts-tooltip-series-group">
+            <span class="apexcharts-tooltip-marker" style="background-color: ${color};"></span>
+            <div class="apexcharts-tooltip-text">
+              <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                <span style="color:var(--muted); font-size:11px;">${s.name}:</span>
+                <span style="font-weight:bold; margin-left:20px; text-align:right;">`;
 
-          if (!d || val == null) return '';
-
-          if (seriesIndex === 0) {
-            return `${formatKRW(val)} (누적)`;
+          if (idx === 0) { // 누적 수익
+            html += formatKRW(val);
+          } else if (idx >= 1 && idx <= assetSeries.length) { // 가격 라인
+            html += d.cur === 'USD' ? `${formatUSD(d.price)}` : formatKRW(d.price);
+          } else { // 진입/청산 마커
+            if (d.eventType === 'close' && d.matchedEntryPrice) {
+              // 청산 시점의 복기 내용 구성
+              const entrySide = d.side === 'Buy' ? 'Short' : 'Long';
+              const pnlColor = d.individualPnL >= 0 ? 'var(--good)' : 'var(--bad)';
+              html += `<div style="line-height:1.4;">
+                <span style="font-size:10px; opacity:0.7;">(${entrySide}) ${d.matchedEntryPrice.toFixed(2)} 진입</span><br>
+                <span>→ (${d.side === 'Buy' ? 'Long' : 'Short'}) ${d.price.toFixed(2)} 청산</span><br>
+                <span style="color:${pnlColor}; font-size:11px; font-weight:800;">손익: ${d.cur === 'USD' ? formatUSD(d.individualPnlCur) : formatKRW(d.individualPnL)}</span>
+              </div>`;
+            } else {
+              html += `${d.side} ${d.qty}qty @ ${d.price.toFixed(2)}`;
+            }
           }
-
-          const assetLabel = d.asset ? ` ${d.asset}` : '';
-          const tradeSide = d.side === 'Buy' ? 'Long' : 'Short';
-          const pnlText = d.cur === 'USD'
-            ? `${d.individualPnL < 0 ? '-' : ''}${formatUSD(Math.abs(Number(d.individualPnlCur || 0)))} / ${formatKRW(Math.abs(d.individualPnL))}`
-            : `${d.individualPnL < 0 ? '-' : ''}${formatKRW(Math.abs(d.individualPnL))}`;
-
-          return `<b>${formatPriceDisplay(d)}</b> <small>(${d.eventLabel}${assetLabel}, ${tradeSide} ${d.qty}계약)</small><br>거래별 손익: ${pnlText}`;
-        }
+          html += `</span></div></div></div>`;
+        });
+        return html;
       }
     }
   };
@@ -2928,31 +2846,31 @@ function addATMRecord() {
   const amt = parseFloat(document.getElementById('atm-amount').value);
   const memo = document.getElementById('atm-memo').value;
 
-  if(!date || isNaN(amt)) return alert("날짜와 금액을 정확히 입력하세요.");
+  if (!date || isNaN(amt)) return alert("날짜와 금액을 정확히 입력하세요.");
 
   atmRecords.push({ id: Date.now(), acc, date, amt, memo });
   localStorage.setItem('blotter_atm_v96', JSON.stringify(atmRecords));
-  
+
   document.getElementById('atm-amount').value = "";
   document.getElementById('atm-memo').value = "";
-blotterMeta.lastLocalInputAt = Date.now();
-saveMeta();
-updateSyncHeader();
+  blotterMeta.lastLocalInputAt = Date.now();
+  saveMeta();
+  updateSyncHeader();
 
 }
 
 function renderATM() {
   const body = document.querySelector('#atmTable tbody');
-  if(!body) return;
+  if (!body) return;
   body.innerHTML = '';
   let moveDom = 0, moveOvs = 0;
 
-  [...atmRecords].sort((a,b) => b.date.localeCompare(a.date)).forEach(r => {
-    if(r.acc === 'DOM') moveDom += r.amt; else moveOvs += r.amt;
+  [...atmRecords].sort((a, b) => b.date.localeCompare(a.date)).forEach(r => {
+    if (r.acc === 'DOM') moveDom += r.amt; else moveOvs += r.amt;
     body.innerHTML += `
       <tr>
-        <td>${r.date}</td><td style="color:${r.acc==='DOM'?'var(--accent)':'var(--warn)'}">${r.acc}</td>
-        <td class="${r.amt>=0?'up':'down'}">${r.amt.toLocaleString()}</td><td>${r.memo || '-'}</td>
+        <td>${r.date}</td><td style="color:${r.acc === 'DOM' ? 'var(--accent)' : 'var(--warn)'}">${r.acc}</td>
+        <td class="${r.amt >= 0 ? 'up' : 'down'}">${r.amt.toLocaleString()}</td><td>${r.memo || '-'}</td>
         <td><button class="btn-danger" style="padding:2px 6px;" onclick="deleteATM(${r.id})">삭제</button></td>
       </tr>`;
   });
@@ -2975,18 +2893,18 @@ function deleteATM(id) {
 }
 
 function updateSyncHeader() {
-  const localEl  = document.getElementById('sync-local');
+  const localEl = document.getElementById('sync-local');
   const importEl = document.getElementById('sync-import');
   const exportEl = document.getElementById('sync-export');
 
   if (!localEl || !importEl || !exportEl) return;
 
   const local = blotterMeta.lastLocalInputAt;
-  const imp   = blotterMeta.lastImportedInputAt;
-  const exp   = blotterMeta.lastExportedInputAt;
+  const imp = blotterMeta.lastImportedInputAt;
+  const exp = blotterMeta.lastExportedInputAt;
 
   // 시간 표시
-  localEl.innerText  = fmtTime(local);
+  localEl.innerText = fmtTime(local);
   importEl.innerText = fmtTime(imp);
   exportEl.innerText = fmtTime(exp);
 
@@ -3057,8 +2975,8 @@ function parseCSVLine(line) {
 
 function getSyncStatus(local, imp, exp) {
   const L = local ? Number(local) : null;
-  const I = imp   ? Number(imp)   : null;
-  const E = exp   ? Number(exp)   : null;
+  const I = imp ? Number(imp) : null;
+  const E = exp ? Number(exp) : null;
 
   if (!L) return 'INIT';
 

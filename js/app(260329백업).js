@@ -21,6 +21,7 @@ let autoImportFromCloudDone = false;
 let autoImportInFlight = false;
 let autoImportDoneUserId = null;
 let authAutoActionsBound = false;
+let integratedChart = null;
 
 function applySyncAuthState(session = null, options = {}) {
   const { keepImportState = false } = options;
@@ -299,7 +300,7 @@ let editingAsset = null;
 let historyFocusKey = null;
 const tableSortState = {
   history: { key: 'inputOrder', dir: 'desc' },
-  report: { key: 'date', dir: 'desc' }
+  report: { key: 'inputOrder', dir: 'asc' }
 };
 const tableSortLabels = {
   history: {
@@ -307,7 +308,7 @@ const tableSortLabels = {
     status: '상태', stopLoss: '스탑', netPnlCur: '순손익(통화)', netPct: '손익률', memo: '메모'
   },
   report: {
-    date: '날짜', asset: '상품', side: '구분', price: '가격', qty: '수량', status: '상태',
+    inputOrder: '입력순', date: '날짜', asset: '상품', side: '구분', price: '가격', qty: '수량', status: '상태',
     realizedPnlCur: '실현손익(통화)', feeCur: '수수료(통화)', netPnlCur: '순손익(통화)', netPct: '손익률', memo: '메모'
   }
 };
@@ -2536,11 +2537,23 @@ function renderPerformanceReport() {
   const end = document.getElementById('repEndDate').value;
   const res = calculateEngine();
   const processed = res.processed;
+  const inputOrderMap = getTradeInputOrderMap(trades);
   initReportAssetFilter(processed);
   const assetFilter = document.getElementById("repAssetFilter")?.value || "ALL";
-  // 선택한 기간에 해당하는 거래만 필터링
-  const filtered = processed.filter(t => (!start || t.date >= start) && (!end || t.date <= end) && (assetFilter === "ALL" || t.asset === assetFilter));
 
+  // 데이터 필터링 및 시간순 정렬
+  const filtered = processed
+    .filter(t => (!start || t.date >= start) && (!end || t.date <= end) && (assetFilter === "ALL" || t.asset === assetFilter))
+    .map(t => ({
+      ...t,
+      inputOrder: inputOrderMap.get(t.id) || 0
+    }))
+    .sort((a, b) => (a.inputOrder || 0) - (b.inputOrder || 0));
+
+  // --- [차트 업데이트 실행] ---
+  updateIntegratedChart(filtered);
+
+  
   // --- [데이터 집계 변수] ---
   let realizedKRW = 0, realizedUSD = 0;
   let feeKRW = 0, feeUSD = 0;
@@ -2584,6 +2597,7 @@ function renderPerformanceReport() {
     const statusLabel = t.status;
     body.innerHTML += `
       <tr>
+        <td>${t.inputOrder || '-'}</td>
         <td>${t.date}</td>
         <td>${t.asset}</td>
         <td>${sidePill(t.side)}</td>
@@ -2641,6 +2655,271 @@ function renderPerformanceReport() {
   document.getElementById('rep-pf').innerHTML = 
     `<span style="color:var(--text)">${tPF}</span> <span style="color:var(--muted); font-size:10px;">/</span> <span style="color:var(--accent)">${pPF}</span>`;
 }
+
+
+/**
+ * [신규] 통합 분석 차트 생성 함수
+ */
+function updateIntegratedChart(filteredTrades) {
+  const chartEl = document.querySelector("#integrated-analysis-chart");
+  if (!chartEl) return;
+
+  if (typeof ApexCharts === 'undefined') {
+    chartEl.innerHTML = "<p style='text-align:center; padding:50px; color:var(--bad);'>차트 라이브러리를 불러오지 못했습니다.</p>";
+    return;
+  }
+
+  if (filteredTrades.length === 0) {
+    if (integratedChart) {
+      integratedChart.destroy();
+      integratedChart = null;
+    }
+    chartEl.innerHTML = "<p style='text-align:center; padding:50px; color:var(--muted);'>데이터가 없습니다.</p>";
+    return;
+  }
+
+  const fxRate = Number.isFinite(globalFX) && globalFX > 0 ? globalFX : 1350;
+  const formatKRW = (value) => `₩${Math.round(Number(value) || 0).toLocaleString()}`;
+  const formatUSD = (value) => `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  let cumulativePnL = 0;
+  const seriesData = filteredTrades.map((t, index) => {
+    cumulativePnL += t.netPnlKRW;
+    const isLong = isLongSide(t.side);
+    const eventType = t.isCloseTrade ? 'close' : (isLong ? 'long-entry' : 'short-entry');
+    const rawPrice = Number(t.price);
+    const price = Number.isFinite(rawPrice) ? rawPrice : 0;
+    const priceInKRW = t.cur === 'USD' ? price * fxRate : price;
+    return {
+      x: `#${t.inputOrder || (index + 1)} ${t.date}`,
+      price,
+      priceInKRW,
+      individualPnL: Math.round(t.netPnlKRW),
+      individualPnlCur: t.netPnlCur,
+      cumulative: Math.round(cumulativePnL),
+      side: t.side,
+      asset: t.asset,
+      inputOrder: t.inputOrder || (index + 1),
+      cur: t.cur,
+      qty: t.qty,
+      eventType,
+      eventLabel: eventType === 'close' ? '청산' : (isLong ? '롱 진입' : '숏 진입'),
+      markerLabel: eventType === 'close' ? '청산' : (isLong ? 'L' : 'S')
+    };
+  });
+
+  const priceValues = seriesData.map((point) => Number(point.priceInKRW)).filter((val) => Number.isFinite(val));
+  const priceMin = priceValues.length ? Math.min(...priceValues) : 0;
+  const priceMax = priceValues.length ? Math.max(...priceValues) : 0;
+  const priceRange = Math.max(priceMax - priceMin, 0);
+  const buffer = Math.max(priceRange * 0.12, Math.abs(priceMax) * 0.03, 1);
+  let priceAxisMin = priceMin - buffer;
+  let priceAxisMax = priceMax + buffer;
+  if (priceAxisMin === priceAxisMax) {
+    priceAxisMin -= 1;
+    priceAxisMax += 1;
+  }
+
+  const uniqueAssets = [...new Set(seriesData.map((d) => `${d.asset || '기타'}__${d.cur || 'KRW'}`))];
+  const assetSeriesMap = uniqueAssets.reduce((acc, assetKey) => {
+    acc[assetKey] = new Array(seriesData.length).fill(null);
+    return acc;
+  }, {});
+  seriesData.forEach((point, idx) => {
+    const assetKey = `${point.asset || '기타'}__${point.cur || 'KRW'}`;
+    assetSeriesMap[assetKey][idx] = point.priceInKRW;
+  });
+
+  const pricePalette = ['#fbbf24', '#0ea5e9', '#f97316', '#a855f7', '#10b981', '#f472b6', '#38bdf8'];
+  const priceSeriesColors = uniqueAssets.map((_, assetIdx) => pricePalette[assetIdx % pricePalette.length]);
+  const priceSeries = uniqueAssets.map((assetKey) => ({
+    name: `${assetKey.replace('__', ' ')} 가격`,
+    type: 'line',
+    data: assetSeriesMap[assetKey]
+  }));
+
+  const formatTradePnlDisplay = (point) => {
+    if (!point || !point.individualPnL) return '';
+
+    const sign = point.individualPnL > 0 ? '+' : '-';
+    const krwText = formatKRW(Math.abs(point.individualPnL));
+
+    if (point.cur === 'USD') {
+      const usdAbs = Math.abs(Number(point.individualPnlCur || 0));
+      const usdText = formatUSD(usdAbs);
+      return `${sign} ${usdText} / ${krwText}`;
+    }
+
+    return `${sign} ${krwText}`;
+  };
+
+  const formatTradeLabel = (point) => {
+    if (!point || point.eventType !== 'close') return '';
+    const pnlText = formatTradePnlDisplay(point);
+    return pnlText ? `청산 ${pnlText}` : '청산';
+  };
+
+  const getPricePointSeries = (eventType) =>
+    seriesData.map((point) => (point.eventType === eventType ? point.priceInKRW : null));
+
+  const getPointBySeriesIndex = (seriesIndex, dataPointIndex) => seriesData[dataPointIndex];
+
+  const longEntryData = getPricePointSeries('long-entry');
+  const shortEntryData = getPricePointSeries('short-entry');
+  const closeData = getPricePointSeries('close');
+
+  const scatterSeries = [
+    { name: '롱 진입', type: 'scatter', data: longEntryData },
+    { name: '숏 진입', type: 'scatter', data: shortEntryData },
+    { name: '청산', type: 'scatter', data: closeData }
+  ];
+
+  const scatterStartIndex = 1 + priceSeries.length;
+  const closeSeriesIndex = scatterStartIndex + 2;
+  const optionsSeries = [
+    { name: '누적 수익 (KRW)', type: 'area', data: seriesData.map(d => d.cumulative) },
+    ...priceSeries,
+    ...scatterSeries
+  ];
+  const seriesColors = ['#5673ff', ...priceSeriesColors, '#22c55e', '#ef4444', '#facc15'];
+  const strokeWidths = [
+    2,
+    ...priceSeries.map(() => 3),
+    ...Array(scatterSeries.length).fill(0)
+  ];
+  const strokeCurves = [
+    'smooth',
+    ...priceSeries.map(() => 'stepline'),
+    ...Array(scatterSeries.length).fill('straight')
+  ];
+  const markerSizes = [0, ...priceSeries.map(() => 0), 6, 6, 7];
+  const markerShapes = [
+    'circle',
+    ...priceSeries.map(() => 'circle'),
+    'circle',
+    'circle',
+    'star'
+  ];
+  const markerStrokeColors = [
+    '#5673ff',
+    ...priceSeriesColors,
+    '#14532d',
+    '#7f1d1d',
+    '#d97706'
+  ];
+
+  const formatPriceAxisLabel = (val) => {
+    if (val == null || !isFinite(val)) return '';
+    return formatKRW(val);
+  };
+
+  const formatPriceDisplay = (point) => {
+    if (!point) return '';
+    return point.cur === 'USD'
+      ? `${formatUSD(point.price)} / ${formatKRW(point.priceInKRW)}`
+      : formatKRW(point.price);
+  };
+
+  const options = {
+    series: optionsSeries,
+    chart: {
+      height: 420,
+      type: 'line',
+      background: 'transparent',
+      toolbar: { show: true },
+      zoom: { enabled: true }
+    },
+    stroke: {
+      width: strokeWidths,
+      curve: strokeCurves // 가격은 계단식으로 표현하여 진입가 유지 시각화
+    },
+    colors: seriesColors,
+    fill: {
+      type: ['gradient', ...Array(priceSeries.length + scatterSeries.length).fill('solid')],
+      gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.1, stops: [0, 90, 100] }
+    },
+    dataLabels: {
+      enabled: true,
+      enabledOnSeries: [closeSeriesIndex],
+      formatter: function (val, opts) {
+        const point = getPointBySeriesIndex(opts.seriesIndex, opts.dataPointIndex);
+        return formatTradeLabel(point);
+      },
+      style: {
+        fontSize: '10px',
+        colors: ['#dce5ff']
+      },
+      offsetY: -12,
+      background: { enabled: true, foreColor: '#fff', padding: 4, borderRadius: 4, borderWidth: 0, opacity: 0.9 }
+    },
+    markers: {
+      size: markerSizes,
+      shape: markerShapes,
+      strokeWidth: 2,
+      strokeColors: markerStrokeColors,
+      hover: { size: 7 }
+    },
+    xaxis: {
+      categories: seriesData.map(d => d.x),
+      tickAmount: Math.min(8, Math.max(4, seriesData.length - 1)),
+      labels: {
+        hideOverlappingLabels: true,
+        trim: true,
+        style: { colors: '#a7b0c5', fontSize: '10px' },
+        rotate: -35,
+        rotateAlways: false
+      }
+    },
+    yaxis: [
+      {
+        title: { text: '누적 수익 (KRW)', style: { color: '#5673ff', fontWeight: 600 } },
+        labels: { style: { colors: '#5673ff' }, formatter: (val) => formatKRW(val) }
+      },
+      {
+        opposite: true,
+        min: priceAxisMin,
+        max: priceAxisMax,
+        forceNiceScale: true,
+        title: { text: '체결 가격 (KRW 환산)', style: { color: '#fbbf24', fontWeight: 600 } },
+        labels: { style: { colors: '#fbbf24' }, formatter: formatPriceAxisLabel }
+      }
+    ],
+    legend: { position: 'top', horizontalAlign: 'center', offsetY: -10, labels: { colors: '#a7b0c5' } },
+    grid: { borderColor: '#2a3145', strokeDashArray: 4 },
+    tooltip: {
+      theme: 'dark',
+      shared: true,
+      y: {
+        formatter: function (val, { seriesIndex, dataPointIndex }) {
+          const d = getPointBySeriesIndex(seriesIndex, dataPointIndex);
+
+          if (!d || val == null) return '';
+
+          if (seriesIndex === 0) {
+            return `${formatKRW(val)} (누적)`;
+          }
+
+          const assetLabel = d.asset ? ` ${d.asset}` : '';
+          const tradeSide = d.side === 'Buy' ? 'Long' : 'Short';
+          const pnlText = d.cur === 'USD'
+            ? `${d.individualPnL < 0 ? '-' : ''}${formatUSD(Math.abs(Number(d.individualPnlCur || 0)))} / ${formatKRW(Math.abs(d.individualPnL))}`
+            : `${d.individualPnL < 0 ? '-' : ''}${formatKRW(Math.abs(d.individualPnL))}`;
+
+          return `<b>${formatPriceDisplay(d)}</b> <small>(${d.eventLabel}${assetLabel}, ${tradeSide} ${d.qty}계약)</small><br>거래별 손익: ${pnlText}`;
+        }
+      }
+    }
+  };
+
+  if (integratedChart) {
+    integratedChart.updateOptions(options);
+  } else {
+    chartEl.innerHTML = '';
+    integratedChart = new ApexCharts(chartEl, options);
+    integratedChart.render();
+  }
+}
+
 
 // 2. ATM 기록 관리
 function addATMRecord() {
@@ -2801,4 +3080,12 @@ function toggleHeaderInfo() {
 
   const expanded = fxContainer.classList.toggle('expanded');
   toggleBtn.textContent = expanded ? '시세/싱크 접기' : '시세/싱크 펼치기';
+}
+
+function toggleCollapse(btn) {
+  const card = btn.closest('.card');
+  if (!card) return;
+
+  const isCollapsed = card.classList.toggle('collapsed');
+  btn.innerText = isCollapsed ? '펼치기' : '접기';
 }
