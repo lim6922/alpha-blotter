@@ -2699,7 +2699,13 @@ function updateIntegratedChart(filteredTrades) {
 
   const fxRate = Number.isFinite(globalFX) && globalFX > 0 ? globalFX : 1350;
   const formatKRW = (v) => `₩${Math.round(v).toLocaleString()}`;
+  const formatFXKRW = (v) => `₩${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const formatUSD = (v) => `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const isFxAsset = (assetId) => assetId === 'USDKRW' || master[assetId]?.ySymbol === 'KRW=X';
+  const formatAssetPrice = (price, assetId, currency = 'KRW') => {
+    if (currency === 'USD') return formatUSD(price);
+    return isFxAsset(assetId) ? formatFXKRW(price) : formatKRW(price);
+  };
 
   // 1. 데이터 가공 (중복 선언 제거됨)
   let cumulative = 0;
@@ -2763,6 +2769,7 @@ function updateIntegratedChart(filteredTrades) {
     priceAxisMin -= 1;
     priceAxisMax += 1;
   }
+  const singleAssetId = uniqueAssets.length === 1 ? uniqueAssets[0].split('__')[0] : null;
 
   const options = {
     series: [
@@ -2863,7 +2870,7 @@ function updateIntegratedChart(filteredTrades) {
     },
     yaxis: [
       { title: { text: '누적 수익 (KRW)', style: { color: '#5673ff' } }, labels: { style: { colors: '#5673ff' }, formatter: (v) => formatKRW(v) } },
-      { opposite: true, min: priceAxisMin, max: priceAxisMax, title: { text: '체결가 (KRW / USD)', style: { color: '#fbbf24' } }, labels: { style: { colors: '#fbbf24' }, formatter: (v) => `${formatKRW(v)} / ${formatUSD(v / fxRate)}` } }
+      { opposite: true, min: priceAxisMin, max: priceAxisMax, title: { text: '체결가 (KRW / USD)', style: { color: '#fbbf24' } }, labels: { style: { colors: '#fbbf24' }, formatter: (v) => `${formatAssetPrice(v, singleAssetId || '')} / ${formatUSD(v / fxRate)}` } }
     ],
     grid: { borderColor: '#2a3145', strokeDashArray: 4 },
     // 고도화된 커스텀 툴팁
@@ -2889,7 +2896,7 @@ function updateIntegratedChart(filteredTrades) {
           if (idx === 0) { // 누적 수익
             html += formatKRW(val);
           } else if (idx >= 1 && idx <= assetSeries.length) { // 가격 라인
-            html += d.cur === 'USD' ? `${formatUSD(d.price)}` : formatKRW(d.price);
+            html += formatAssetPrice(d.price, d.asset, d.cur);
           } else { // 진입/청산 마커
             if (d.eventType === 'close' && d.matchedEntryPrice) {
               // 청산 시점의 복기 내용 구성
@@ -2899,12 +2906,12 @@ function updateIntegratedChart(filteredTrades) {
                 ? `${formatUSD(d.individualPnlCur)} / ${formatKRW(d.individualPnL)}`
                 : `${formatKRW(d.individualPnL)} / ${formatUSD(d.individualPnL / fxRate)}`;
               html += `<div style="line-height:1.4;">
-                <span style="font-size:10px; opacity:0.7;">(${entrySide}) ${d.matchedEntryPrice.toFixed(2)} 진입</span><br>
-                <span>→ (${d.side === 'Buy' ? 'Long' : 'Short'}) ${d.price.toFixed(2)} 청산</span><br>
+                <span style="font-size:10px; opacity:0.7;">(${entrySide}) ${isFxAsset(d.asset) ? Number(d.matchedEntryPrice).toFixed(2) : d.matchedEntryPrice.toFixed(2)} 진입</span><br>
+                <span>→ (${d.side === 'Buy' ? 'Long' : 'Short'}) ${isFxAsset(d.asset) ? Number(d.price).toFixed(2) : d.price.toFixed(2)} 청산</span><br>
                 <span style="color:${pnlColor}; font-size:11px; font-weight:800;">손익: ${pnlDisplay}</span>
               </div>`;
             } else {
-              html += `${d.side} ${d.qty}qty @ ${d.price.toFixed(2)}`;
+              html += `${d.side} ${d.qty}qty @ ${isFxAsset(d.asset) ? Number(d.price).toFixed(2) : d.price.toFixed(2)}`;
             }
           }
           html += `</span></div></div></div>`;

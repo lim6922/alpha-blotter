@@ -699,6 +699,11 @@ button {
     padding: 0;
 }
 
+#integrated-analysis-chart .apexcharts-legend-marker,
+#integrated-analysis-chart .apexcharts-legend-series svg {
+    display: none !important;
+}
+
 #integrated-analysis-chart .apexcharts-chart-area {
     padding-bottom: 10px;
 }
