@@ -2786,15 +2786,7 @@ function updateIntegratedChart(filteredTrades) {
       fontSize: '12px',
       itemMargin: { horizontal: 12, vertical: 8 },
       labels: { colors: '#a7b0c5' },
-      markers: {
-        radius: 12,
-        customHTML: function({ seriesIndex }) {
-          if (seriesIndex === longSeriesIndex) return '<span style="color:#22c55e;font-size:14px;line-height:1;">▲</span>';
-          if (seriesIndex === shortSeriesIndex) return '<span style="color:#ef4444;font-size:14px;line-height:1;">▼</span>';
-          if (seriesIndex === closeSeriesIndex) return '<span style="color:#facc15;font-size:14px;line-height:1;">★</span>';
-          return '';
-        }
-      }
+      markers: { radius: 12 }
     },
     markers: { 
       size: [0, ...assetSeries.map(() => 0), 0, 0, 8], 
