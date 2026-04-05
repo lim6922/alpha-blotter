@@ -722,6 +722,12 @@ button {
     stroke-width: 3px;
 }
 
+#integrated-analysis-chart .apexcharts-data-labels rect,
+#integrated-analysis-chart .apexcharts-datalabels rect {
+    fill: #facc15 !important;
+    opacity: 0.95;
+}
+
 
 /* =========================================================================
    [8] UTILITIES & STATES

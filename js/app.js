@@ -2737,9 +2737,27 @@ function updateIntegratedChart(filteredTrades) {
     };
   });
   const scatterStartIndex = 1 + assetSeries.length;
-  const longSeriesIndex = scatterStartIndex;
-  const shortSeriesIndex = scatterStartIndex + 1;
   const closeSeriesIndex = scatterStartIndex + 2;
+  const entryAnnotations = seriesData
+    .filter((point) => point.eventType === 'long-entry' || point.eventType === 'short-entry')
+    .map((point) => ({
+      x: point.x,
+      y: point.priceInKRW,
+      marker: {
+        size: 0
+      },
+      label: {
+        borderColor: 'transparent',
+        offsetY: point.eventType === 'long-entry' ? 10 : -10,
+        style: {
+          background: 'transparent',
+          color: point.eventType === 'long-entry' ? '#22c55e' : '#ef4444',
+          fontSize: '18px',
+          fontWeight: 700
+        },
+        text: point.eventType === 'long-entry' ? '▲' : '▼'
+      }
+    }));
   const priceValues = seriesData.map(d => d.priceInKRW).filter(v => Number.isFinite(v));
   const priceMin = priceValues.length ? Math.min(...priceValues) : 0;
   const priceMax = priceValues.length ? Math.max(...priceValues) : 0;
@@ -2768,14 +2786,7 @@ function updateIntegratedChart(filteredTrades) {
       background: 'transparent',
       toolbar: { show: true },
       zoom: { enabled: true },
-      events: {
-        mounted: function(chartCtx) {
-          orientEntryMarkers(chartCtx.el);
-        },
-        updated: function(chartCtx) {
-          orientEntryMarkers(chartCtx.el);
-        }
-      }
+      events: {}
     },
     colors: ['#5673ff', '#fbbf24', '#0ea5e9', '#f97316', '#22c55e', '#ef4444', '#facc15'],
     stroke: {
@@ -2796,12 +2807,12 @@ function updateIntegratedChart(filteredTrades) {
       markers: { radius: 12 }
     },
     markers: { 
-      size: [0, ...assetSeries.map(() => 0), 6, 6, 8], 
+      size: [0, ...assetSeries.map(() => 0), 0, 0, 8], 
       shape: [
         'circle', 
         ...assetSeries.map(() => 'circle'), 
-        'triangle',
-        'triangle',
+        'circle',
+        'circle',
         'star'
       ],
       strokeWidth: 2
@@ -2840,6 +2851,9 @@ function updateIntegratedChart(filteredTrades) {
       { opposite: true, min: priceAxisMin, max: priceAxisMax, title: { text: '체결가 (KRW / USD)', style: { color: '#fbbf24' } }, labels: { style: { colors: '#fbbf24' }, formatter: (v) => `${formatKRW(v)} / ${formatUSD(v / fxRate)}` } }
     ],
     grid: { borderColor: '#2a3145', strokeDashArray: 4 },
+    annotations: {
+      points: entryAnnotations
+    },
     // 고도화된 커스텀 툴팁
     tooltip: {
       theme: 'dark',
@@ -2884,27 +2898,6 @@ function updateIntegratedChart(filteredTrades) {
       }
     }
   };
-
-  function orientEntryMarkers(chartRoot) {
-    if (!chartRoot) return;
-    const seriesEls = chartRoot.querySelectorAll('.apexcharts-series');
-    const shortSeries = seriesEls[shortSeriesIndex];
-    const longSeries = seriesEls[longSeriesIndex];
-
-    if (longSeries) {
-      longSeries.querySelectorAll('.apexcharts-marker').forEach((marker) => {
-        marker.style.transformOrigin = 'center';
-        marker.style.rotate = '0deg';
-      });
-    }
-
-    if (shortSeries) {
-      shortSeries.querySelectorAll('.apexcharts-marker').forEach((marker) => {
-        marker.style.transformOrigin = 'center';
-        marker.style.rotate = '180deg';
-      });
-    }
-  }
 
   if (integratedChart) {
     integratedChart.updateOptions(options);
