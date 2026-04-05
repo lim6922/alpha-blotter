@@ -2786,7 +2786,24 @@ function updateIntegratedChart(filteredTrades) {
       fontSize: '12px',
       itemMargin: { horizontal: 12, vertical: 8 },
       labels: { colors: '#a7b0c5' },
-      markers: { radius: 12 }
+      markers: {
+        radius: 12,
+        width: 0,
+        height: 0
+      },
+      formatter: function(seriesName, opts = {}) {
+        const seriesIndex = opts.seriesIndex;
+        if (seriesIndex === longSeriesIndex) {
+          return `<span style="color:#22c55e;font-weight:700;">▲</span> ${seriesName}`;
+        }
+        if (seriesIndex === shortSeriesIndex) {
+          return `<span style="color:#ef4444;font-weight:700;">▼</span> ${seriesName}`;
+        }
+        if (seriesIndex === closeSeriesIndex) {
+          return `<span style="color:#facc15;font-weight:700;">★</span> ${seriesName}`;
+        }
+        return seriesName;
+      }
     },
     markers: { 
       size: [0, ...assetSeries.map(() => 0), 0, 0, 8], 
