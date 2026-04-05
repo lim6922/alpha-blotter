@@ -2788,8 +2788,8 @@ function updateIntegratedChart(filteredTrades) {
       shape: [
         'circle', 
         ...assetSeries.map(() => 'circle'), 
-        'path://M-5 4L0 -4L5 4Z', 
-        'path://M-5 -4L0 4L5 -4Z', 
+        'path://M0 -6L6 4H-6Z',        // long arrow pointing up
+        'path://M0 6L6 -4H-6Z',        // short arrow pointing down
         'star'
       ],
       strokeWidth: 2
