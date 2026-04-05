@@ -2736,6 +2736,10 @@ function updateIntegratedChart(filteredTrades) {
       data: seriesData.map(d => (`${d.asset}__${d.cur}` === assetKey ? d.priceInKRW : null))
     };
   });
+  const scatterStartIndex = 1 + assetSeries.length;
+  const longSeriesIndex = scatterStartIndex;
+  const shortSeriesIndex = scatterStartIndex + 1;
+  const closeSeriesIndex = scatterStartIndex + 2;
 
   const priceValues = seriesData.map(d => d.priceInKRW).filter(v => Number.isFinite(v));
   const priceMin = priceValues.length ? Math.min(...priceValues) : 0;
@@ -2786,7 +2790,7 @@ function updateIntegratedChart(filteredTrades) {
     },
     markers: { 
       size: [0, ...assetSeries.map(() => 0), 6, 6, 8], 
-      shape: [...Array(assetSeries.length + 3).fill('circle'), 'star'],
+      shape: ['circle', ...assetSeries.map(() => 'circle'), 'triangle', 'triangle', 'star'],
       strokeWidth: 2
     },
     xaxis: { 
@@ -2843,12 +2847,28 @@ function updateIntegratedChart(filteredTrades) {
     }
   };
 
+  const rotateMarkers = () => {
+    requestAnimationFrame(() => {
+      const seriesEls = chartEl.querySelectorAll('.apexcharts-series');
+      const rotateSeries = (idx, deg) => {
+        const group = seriesEls[idx];
+        if (!group) return;
+        group.querySelectorAll('.apexcharts-marker').forEach(marker => {
+          marker.style.transform = `rotate(${deg}deg)`;
+        });
+      };
+      rotateSeries(longSeriesIndex, 0);
+      rotateSeries(shortSeriesIndex, 180);
+    });
+  };
+
   if (integratedChart) {
     integratedChart.updateOptions(options);
+    rotateMarkers();
   } else {
     chartEl.innerHTML = '';
     integratedChart = new ApexCharts(chartEl, options);
-    integratedChart.render();
+    integratedChart.render().then(rotateMarkers);
   }
 }
 
