@@ -476,6 +476,19 @@ button {
     font-weight: bold !important;
 }
 
+/* 리포트 차트 Legend 정렬 */
+#integrated-analysis-chart .apexcharts-legend {
+    justify-content: center !important;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+@media (max-width: 768px) {
+    #integrated-analysis-chart .apexcharts-legend {
+        justify-content: flex-start !important;
+    }
+}
+
 /* 차트 내부 데이터 라벨 스타일 */
 .apexcharts-datalabel-label {
     fill: #fff !important;
