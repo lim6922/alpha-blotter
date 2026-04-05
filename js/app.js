@@ -2799,7 +2799,7 @@ function updateIntegratedChart(filteredTrades) {
     },
     yaxis: [
       { title: { text: '누적 수익 (KRW)', style: { color: '#5673ff' } }, labels: { style: { colors: '#5673ff' }, formatter: (v) => formatKRW(v) } },
-      { opposite: true, min: priceAxisMin, max: priceAxisMax, title: { text: '체결가 (KRW 환산)', style: { color: '#fbbf24' } }, labels: { style: { colors: '#fbbf24' }, formatter: (v) => formatKRW(v) } }
+      { opposite: true, min: priceAxisMin, max: priceAxisMax, title: { text: '체결가 (KRW / USD)', style: { color: '#fbbf24' } }, labels: { style: { colors: '#fbbf24' }, formatter: (v) => `${formatKRW(v)} / ${formatUSD(v / fxRate)}` } }
     ],
     grid: { borderColor: '#2a3145', strokeDashArray: 4 },
     // 고도화된 커스텀 툴팁
