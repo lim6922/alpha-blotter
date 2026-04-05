@@ -2739,7 +2739,8 @@ function updateIntegratedChart(filteredTrades) {
   const scatterStartIndex = 1 + assetSeries.length;
   const longSeriesIndex = scatterStartIndex;
   const shortSeriesIndex = scatterStartIndex + 1;
-  const closeSeriesIndex = scatterStartIndex + 2;
+  const closeProfitSeriesIndex = scatterStartIndex + 2;
+  const closeLossSeriesIndex = scatterStartIndex + 3;
   const priceValues = seriesData.map(d => d.priceInKRW).filter(v => Number.isFinite(v));
   const priceMin = priceValues.length ? Math.min(...priceValues) : 0;
   const priceMax = priceValues.length ? Math.max(...priceValues) : 0;
@@ -2760,7 +2761,8 @@ function updateIntegratedChart(filteredTrades) {
       ...assetSeries,
       { name: '롱 진입', type: 'scatter', data: seriesData.map(d => d.eventType === 'long-entry' ? d.priceInKRW : null) },
       { name: '숏 진입', type: 'scatter', data: seriesData.map(d => d.eventType === 'short-entry' ? d.priceInKRW : null) },
-      { name: '청산', type: 'scatter', data: seriesData.map(d => d.eventType === 'close' ? d.priceInKRW : null) }
+      { name: '이익 청산', type: 'scatter', data: seriesData.map(d => (d.eventType === 'close' && d.individualPnL >= 0) ? d.priceInKRW : null) },
+      { name: '손실 청산', type: 'scatter', data: seriesData.map(d => (d.eventType === 'close' && d.individualPnL < 0) ? d.priceInKRW : null) }
     ],
     chart: {
       height: 500, // 차트 높이 확대
@@ -2770,13 +2772,13 @@ function updateIntegratedChart(filteredTrades) {
       zoom: { enabled: true },
       events: {}
     },
-    colors: ['#5673ff', '#fbbf24', '#0ea5e9', '#f97316', '#22c55e', '#ef4444', '#facc15'],
+    colors: ['#5673ff', '#fbbf24', '#0ea5e9', '#f97316', '#22c55e', '#ef4444', '#facc15', '#f87171'],
     stroke: {
-      width: [2, ...assetSeries.map(() => 3), 0, 0, 0],
-      curve: ['smooth', ...assetSeries.map(() => 'stepline'), 'straight', 'straight', 'straight']
+      width: [2, ...assetSeries.map(() => 3), 0, 0, 0, 0],
+      curve: ['smooth', ...assetSeries.map(() => 'stepline'), 'straight', 'straight', 'straight', 'straight']
     },
     fill: {
-      type: ['gradient', ...Array(assetSeries.length + 4).fill('solid')],
+      type: ['gradient', ...Array(assetSeries.length + 5).fill('solid')],
       gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05, stops: [0, 90, 100] }
     },
     // 범례 Horizon 설정
@@ -2799,19 +2801,23 @@ function updateIntegratedChart(filteredTrades) {
         if (seriesIndex === shortSeriesIndex) {
           return `<span style="color:#ef4444;font-weight:700;">▼</span> ${seriesName}`;
         }
-        if (seriesIndex === closeSeriesIndex) {
+        if (seriesIndex === closeProfitSeriesIndex) {
           return `<span style="color:#facc15;font-weight:700;">★</span> ${seriesName}`;
+        }
+        if (seriesIndex === closeLossSeriesIndex) {
+          return `<span style="color:#f87171;font-weight:700;">★</span> ${seriesName}`;
         }
         return seriesName;
       }
     },
     markers: { 
-      size: [0, ...assetSeries.map(() => 0), 0, 0, 8], 
+      size: [0, ...assetSeries.map(() => 0), 0, 0, 8, 8], 
       shape: [
         'circle', 
         ...assetSeries.map(() => 'circle'), 
         'circle',
         'circle',
+        'star',
         'star'
       ],
       strokeWidth: 2
