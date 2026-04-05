@@ -2884,7 +2884,7 @@ function updateIntegratedChart(filteredTrades) {
         labels: { style: { colors: '#fbbf24' }, formatter: formatPriceAxisLabel }
       }
     ],
-    legend: { position: 'top', horizontalAlign: 'right', labels: { colors: '#a7b0c5' } },
+    legend: { position: 'top', horizontalAlign: 'center', offsetY: -10, labels: { colors: '#a7b0c5' } },
     grid: { borderColor: '#2a3145', strokeDashArray: 4 },
     tooltip: {
       theme: 'dark',
