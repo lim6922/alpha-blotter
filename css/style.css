@@ -715,6 +715,8 @@ button {
 
 #integrated-analysis-chart .apexcharts-data-label {
     font-family: 'JetBrains Mono', monospace;
+    fill: #111111 !important;
+    color: #111111 !important;
     paint-order: stroke;
     stroke: rgba(11, 13, 18, 0.9);
     stroke-width: 3px;

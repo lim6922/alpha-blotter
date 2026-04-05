@@ -2818,17 +2818,14 @@ function updateIntegratedChart(filteredTrades) {
       },
       offsetY: -28,
       style: {
-        colors: [function(opts) {
-          const point = seriesData[opts.dataPointIndex];
-          return (point?.individualPnL || 0) >= 0 ? '#86efac' : '#fca5a5';
-        }],
+        colors: ['#111111'],
         fontSize: '11px',
         fontWeight: '600'
       },
       background: {
         enabled: true,
-        foreColor: '#e5e7eb',
-        backColor: '#111827',
+        foreColor: '#111111',
+        backColor: '#facc15',
         borderRadius: 4,
         padding: 5,
         opacity: 0.95
@@ -2897,14 +2894,14 @@ function updateIntegratedChart(filteredTrades) {
     if (longSeries) {
       longSeries.querySelectorAll('.apexcharts-marker').forEach((marker) => {
         marker.style.transformOrigin = 'center';
-        marker.style.transform = 'rotate(0deg)';
+        marker.style.rotate = '0deg';
       });
     }
 
     if (shortSeries) {
       shortSeries.querySelectorAll('.apexcharts-marker').forEach((marker) => {
         marker.style.transformOrigin = 'center';
-        marker.style.transform = 'rotate(180deg)';
+        marker.style.rotate = '180deg';
       });
     }
   }
