@@ -2811,17 +2811,25 @@ function updateIntegratedChart(filteredTrades) {
       },
       formatter: function(seriesName, opts = {}) {
         const seriesIndex = opts.seriesIndex;
+        const iconSize = '15px';
+        if (seriesIndex === 0) {
+          return `<span style="color:#5673ff;font-size:${iconSize};font-weight:700;line-height:1;">◆</span> ${seriesName}`;
+        }
+        if (seriesIndex >= 1 && seriesIndex <= assetSeries.length) {
+          const lineColor = chartColors[seriesIndex];
+          return `<span style="color:${lineColor};font-size:${iconSize};font-weight:700;line-height:1;">━</span> ${seriesName}`;
+        }
         if (seriesIndex === longSeriesIndex) {
-          return `<span style="color:#22c55e;font-size:16px;font-weight:700;line-height:1;">▲</span> ${seriesName}`;
+          return `<span style="color:#22c55e;font-size:${iconSize};font-weight:700;line-height:1;">▲</span> ${seriesName}`;
         }
         if (seriesIndex === shortSeriesIndex) {
-          return `<span style="color:#ef4444;font-size:16px;font-weight:700;line-height:1;">▼</span> ${seriesName}`;
+          return `<span style="color:#ef4444;font-size:${iconSize};font-weight:700;line-height:1;">▼</span> ${seriesName}`;
         }
         if (seriesIndex === closeProfitSeriesIndex) {
-          return `<span style="color:#facc15;font-size:16px;font-weight:700;line-height:1;">+</span> ${seriesName}`;
+          return `<span style="color:#facc15;font-size:${iconSize};font-weight:700;line-height:1;">+</span> ${seriesName}`;
         }
         if (seriesIndex === closeLossSeriesIndex) {
-          return `<span style="color:#f87171;font-size:16px;font-weight:700;line-height:1;">-</span> ${seriesName}`;
+          return `<span style="color:#f87171;font-size:${iconSize};font-weight:700;line-height:1;">-</span> ${seriesName}`;
         }
         return seriesName;
       }
