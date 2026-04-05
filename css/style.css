@@ -686,6 +686,27 @@ button {
     }
 }
 
+#integrated-analysis-chart .apexcharts-legend-group,
+#integrated-analysis-chart .apexcharts-legend-group-vertical {
+    flex-direction: row !important;
+    align-items: center;
+    gap: 12px;
+    width: auto !important;
+}
+
+#integrated-analysis-chart .apexcharts-legend-series {
+    margin: 0 6px;
+    padding: 0;
+}
+
+#integrated-analysis-chart .apexcharts-chart-area {
+    padding-bottom: 10px;
+}
+
+#integrated-analysis-chart {
+    min-height: 500px;
+}
+
 /* 차트 내부 데이터 라벨 스타일 */
 .apexcharts-datalabel-label {
     fill: #fff !important;
