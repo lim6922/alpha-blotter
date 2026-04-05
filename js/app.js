@@ -2781,7 +2781,7 @@ function updateIntegratedChart(filteredTrades) {
     ...priceSeries,
     ...scatterSeries
   ];
-  const seriesColors = ['#5673ff', ...priceSeriesColors, '#22c55e', '#ef4444', '#f97316'];
+  const seriesColors = ['#5673ff', ...priceSeriesColors, '#22c55e', '#ef4444', '#facc15'];
   const strokeWidths = [
     2,
     ...priceSeries.map(() => 3),
@@ -2798,14 +2798,14 @@ function updateIntegratedChart(filteredTrades) {
     ...priceSeries.map(() => 'circle'),
     'circle',
     'circle',
-    'diamond'
+    'star'
   ];
   const markerStrokeColors = [
     '#5673ff',
     ...priceSeriesColors,
     '#14532d',
     '#7f1d1d',
-    '#7c2d12'
+    '#d97706'
   ];
 
   const formatPriceAxisLabel = (val) => {
