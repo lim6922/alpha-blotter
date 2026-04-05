@@ -2805,16 +2805,16 @@ function updateIntegratedChart(filteredTrades) {
       formatter: function(seriesName, opts = {}) {
         const seriesIndex = opts.seriesIndex;
         if (seriesIndex === longSeriesIndex) {
-          return `<span style="color:#22c55e;font-weight:700;">▲</span> ${seriesName}`;
+          return `<span style="color:#22c55e;font-size:16px;font-weight:700;line-height:1;">▲</span> ${seriesName}`;
         }
         if (seriesIndex === shortSeriesIndex) {
-          return `<span style="color:#ef4444;font-weight:700;">▼</span> ${seriesName}`;
+          return `<span style="color:#ef4444;font-size:16px;font-weight:700;line-height:1;">▼</span> ${seriesName}`;
         }
         if (seriesIndex === closeProfitSeriesIndex) {
-          return `<span style="color:#facc15;font-weight:700;">+</span> ${seriesName}`;
+          return `<span style="color:#facc15;font-size:16px;font-weight:700;line-height:1;">+</span> ${seriesName}`;
         }
         if (seriesIndex === closeLossSeriesIndex) {
-          return `<span style="color:#f87171;font-weight:700;">-</span> ${seriesName}`;
+          return `<span style="color:#f87171;font-size:16px;font-weight:700;line-height:1;">-</span> ${seriesName}`;
         }
         return seriesName;
       }
@@ -2852,7 +2852,7 @@ function updateIntegratedChart(filteredTrades) {
           if (opts.seriesIndex === closeLossSeriesIndex) return '#f87171';
           return '#111111';
         }],
-        fontSize: '14px',
+        fontSize: '22px',
         fontWeight: '700'
       },
       background: { enabled: false }
