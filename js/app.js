@@ -2854,6 +2854,7 @@ function updateIntegratedChart(filteredTrades) {
         const group = seriesEls[idx];
         if (!group) return;
         group.querySelectorAll('.apexcharts-marker').forEach(marker => {
+          marker.style.transformOrigin = 'center';
           marker.style.transform = `rotate(${deg}deg)`;
         });
       };
