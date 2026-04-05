@@ -2678,14 +2678,22 @@ function updateIntegratedChart(filteredTrades) {
     return;
   }
 
+  const fxRate = Number.isFinite(globalFX) && globalFX > 0 ? globalFX : 1350;
+  const formatKRW = (value) => `₩${Math.round(Number(value) || 0).toLocaleString()}`;
+  const formatUSD = (value) => `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
   let cumulativePnL = 0;
   const seriesData = filteredTrades.map((t, index) => {
     cumulativePnL += t.netPnlKRW;
     const isLong = isLongSide(t.side);
     const eventType = t.isCloseTrade ? 'close' : (isLong ? 'long-entry' : 'short-entry');
+    const rawPrice = Number(t.price);
+    const price = Number.isFinite(rawPrice) ? rawPrice : 0;
+    const priceInKRW = t.cur === 'USD' ? price * fxRate : price;
     return {
       x: `#${t.inputOrder || (index + 1)} ${t.date}`,
-      price: t.price,
+      price,
+      priceInKRW,
       individualPnL: Math.round(t.netPnlKRW),
       individualPnlCur: t.netPnlCur,
       cumulative: Math.round(cumulativePnL),
@@ -2700,11 +2708,11 @@ function updateIntegratedChart(filteredTrades) {
     };
   });
 
-  const priceValues = seriesData.map(point => Number(point.price)).filter(val => Number.isFinite(val));
+  const priceValues = seriesData.map((point) => Number(point.priceInKRW)).filter((val) => Number.isFinite(val));
   const priceMin = priceValues.length ? Math.min(...priceValues) : 0;
   const priceMax = priceValues.length ? Math.max(...priceValues) : 0;
   const priceRange = Math.max(priceMax - priceMin, 0);
-  const buffer = Math.max(priceRange * 0.08, priceMax * 0.01, 1);
+  const buffer = Math.max(priceRange * 0.12, Math.abs(priceMax) * 0.03, 1);
   let priceAxisMin = priceMin - buffer;
   let priceAxisMax = priceMax + buffer;
   if (priceAxisMin === priceAxisMax) {
@@ -2712,63 +2720,47 @@ function updateIntegratedChart(filteredTrades) {
     priceAxisMax += 1;
   }
 
-  const fxRate = Number.isFinite(globalFX) && globalFX > 0 ? globalFX : 1350;
-  const currencyCounts = seriesData.reduce((acc, point) => {
-    acc[point.cur === 'USD' ? 'USD' : 'KRW'] += 1;
-    return acc;
-  }, { USD: 0, KRW: 0 });
-  const axisBaseCurrency = currencyCounts.USD > currencyCounts.KRW ? 'USD' : 'KRW';
-
-  const uniqueAssets = [...new Set(seriesData.map(d => d.asset || '기타'))];
-  const assetSeriesMap = uniqueAssets.reduce((acc, asset) => {
-    acc[asset] = new Array(seriesData.length).fill(null);
+  const uniqueAssets = [...new Set(seriesData.map((d) => `${d.asset || '기타'}__${d.cur || 'KRW'}`))];
+  const assetSeriesMap = uniqueAssets.reduce((acc, assetKey) => {
+    acc[assetKey] = new Array(seriesData.length).fill(null);
     return acc;
   }, {});
   seriesData.forEach((point, idx) => {
-    const assetKey = point.asset || '기타';
-    assetSeriesMap[assetKey][idx] = point.price;
+    const assetKey = `${point.asset || '기타'}__${point.cur || 'KRW'}`;
+    assetSeriesMap[assetKey][idx] = point.priceInKRW;
   });
 
   const pricePalette = ['#fbbf24', '#0ea5e9', '#f97316', '#a855f7', '#10b981', '#f472b6', '#38bdf8'];
   const priceSeriesColors = uniqueAssets.map((_, assetIdx) => pricePalette[assetIdx % pricePalette.length]);
-  const priceSeries = uniqueAssets.map((asset) => ({
-    name: `${asset} 체결 가격`,
+  const priceSeries = uniqueAssets.map((assetKey) => ({
+    name: `${assetKey.replace('__', ' ')} 가격`,
     type: 'line',
-    data: assetSeriesMap[asset]
+    data: assetSeriesMap[assetKey]
   }));
 
   const formatTradePnlDisplay = (point) => {
     if (!point || !point.individualPnL) return '';
 
-    const sign = point.individualPnL > 0 ? '▲' : '▼';
-    const krwText = `₩${(Math.abs(point.individualPnL) / 10000).toFixed(1)}만`;
+    const sign = point.individualPnL > 0 ? '+' : '-';
+    const krwText = formatKRW(Math.abs(point.individualPnL));
 
     if (point.cur === 'USD') {
       const usdAbs = Math.abs(Number(point.individualPnlCur || 0));
-      const usdText = `$${usdAbs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const usdText = formatUSD(usdAbs);
       return `${sign} ${usdText} / ${krwText}`;
     }
 
     return `${sign} ${krwText}`;
   };
 
-  const labelOffsets = {
-    'long-entry': -20,
-    'short-entry': 18,
-    'close': -10
-  };
-
   const formatTradeLabel = (point) => {
-    if (!point) return '';
+    if (!point || point.eventType !== 'close') return '';
     const pnlText = formatTradePnlDisplay(point);
-    const badge = point.markerLabel || '';
-    const offset = labelOffsets[point.eventType] || -12;
-    if (!pnlText) return `<span style="display:inline-block; transform:translateY(${offset}px);">${badge}</span>`;
-    return `<div style="display:inline-flex; align-items:center; transform:translateY(${offset}px);">${badge} ${pnlText}</div>`;
+    return pnlText ? `청산 ${pnlText}` : '청산';
   };
 
   const getPricePointSeries = (eventType) =>
-    seriesData.map((point) => (point.eventType === eventType ? point.price : null));
+    seriesData.map((point) => (point.eventType === eventType ? point.priceInKRW : null));
 
   const getPointBySeriesIndex = (seriesIndex, dataPointIndex) => seriesData[dataPointIndex];
 
@@ -2783,7 +2775,7 @@ function updateIntegratedChart(filteredTrades) {
   ];
 
   const scatterStartIndex = 1 + priceSeries.length;
-  const scatterIndices = scatterSeries.map((_, idx) => scatterStartIndex + idx);
+  const closeSeriesIndex = scatterStartIndex + 2;
   const optionsSeries = [
     { name: '누적 수익 (KRW)', type: 'area', data: seriesData.map(d => d.cumulative) },
     ...priceSeries,
@@ -2818,20 +2810,20 @@ function updateIntegratedChart(filteredTrades) {
 
   const formatPriceAxisLabel = (val) => {
     if (val == null || !isFinite(val)) return '';
-    if (axisBaseCurrency === 'USD') {
-      const usdLabel = `$${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      const krwLabel = `₩${Math.round(val * fxRate).toLocaleString()}`;
-      return `${usdLabel}\n${krwLabel}`;
-    }
-    const krwLabel = `₩${Math.round(val).toLocaleString()}`;
-    const usdLabel = `$${(val / fxRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    return `${krwLabel}\n${usdLabel}`;
+    return formatKRW(val);
+  };
+
+  const formatPriceDisplay = (point) => {
+    if (!point) return '';
+    return point.cur === 'USD'
+      ? `${formatUSD(point.price)} / ${formatKRW(point.priceInKRW)}`
+      : formatKRW(point.price);
   };
 
   const options = {
     series: optionsSeries,
     chart: {
-      height: 400,
+      height: 420,
       type: 'line',
       background: 'transparent',
       toolbar: { show: true },
@@ -2848,7 +2840,7 @@ function updateIntegratedChart(filteredTrades) {
     },
     dataLabels: {
       enabled: true,
-      enabledOnSeries: scatterIndices,
+      enabledOnSeries: [closeSeriesIndex],
       formatter: function (val, opts) {
         const point = getPointBySeriesIndex(opts.seriesIndex, opts.dataPointIndex);
         return formatTradeLabel(point);
@@ -2857,8 +2849,8 @@ function updateIntegratedChart(filteredTrades) {
         fontSize: '10px',
         colors: ['#dce5ff']
       },
-      offsetY: 0,
-      background: { enabled: true, foreColor: '#fff', padding: 3, borderRadius: 2, borderWidth: 0, opacity: 0.85 }
+      offsetY: -12,
+      background: { enabled: true, foreColor: '#fff', padding: 4, borderRadius: 4, borderWidth: 0, opacity: 0.9 }
     },
     markers: {
       size: markerSizes,
@@ -2869,18 +2861,26 @@ function updateIntegratedChart(filteredTrades) {
     },
     xaxis: {
       categories: seriesData.map(d => d.x),
-      labels: { style: { colors: '#a7b0c5', fontSize: '10px' }, rotate: -45, rotateAlways: false }
+      tickAmount: Math.min(8, Math.max(4, seriesData.length - 1)),
+      labels: {
+        hideOverlappingLabels: true,
+        trim: true,
+        style: { colors: '#a7b0c5', fontSize: '10px' },
+        rotate: -35,
+        rotateAlways: false
+      }
     },
     yaxis: [
       {
         title: { text: '누적 수익 (KRW)', style: { color: '#5673ff', fontWeight: 600 } },
-        labels: { style: { colors: '#5673ff' }, formatter: (val) => (val / 10000).toFixed(0) + "만" }
+        labels: { style: { colors: '#5673ff' }, formatter: (val) => formatKRW(val) }
       },
       {
         opposite: true,
         min: priceAxisMin,
         max: priceAxisMax,
-        title: { text: '체결 가격', style: { color: '#fbbf24', fontWeight: 600 } },
+        forceNiceScale: true,
+        title: { text: '체결 가격 (KRW 환산)', style: { color: '#fbbf24', fontWeight: 600 } },
         labels: { style: { colors: '#fbbf24' }, formatter: formatPriceAxisLabel }
       }
     ],
@@ -2895,12 +2895,17 @@ function updateIntegratedChart(filteredTrades) {
 
           if (!d || val == null) return '';
 
-          const assetLabel = d.asset ? ` ${d.asset}` : '';
-          const pnlText = d.cur === 'USD'
-            ? `${d.individualPnL < 0 ? '-' : ''}$${Math.abs(Number(d.individualPnlCur || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ₩${Math.abs(d.individualPnL).toLocaleString()}`
-            : `₩${d.individualPnL.toLocaleString()}`;
+          if (seriesIndex === 0) {
+            return `${formatKRW(val)} (누적)`;
+          }
 
-          return `<b>${val.toLocaleString()}</b> <small>(${d.eventLabel}${assetLabel}, ${d.side === 'Buy' ? 'Long' : 'Short'} ${d.qty}계약)</small><br>거래별 손익: ${pnlText}`;
+          const assetLabel = d.asset ? ` ${d.asset}` : '';
+          const tradeSide = d.side === 'Buy' ? 'Long' : 'Short';
+          const pnlText = d.cur === 'USD'
+            ? `${d.individualPnL < 0 ? '-' : ''}${formatUSD(Math.abs(Number(d.individualPnlCur || 0)))} / ${formatKRW(Math.abs(d.individualPnL))}`
+            : `${d.individualPnL < 0 ? '-' : ''}${formatKRW(Math.abs(d.individualPnL))}`;
+
+          return `<b>${formatPriceDisplay(d)}</b> <small>(${d.eventLabel}${assetLabel}, ${tradeSide} ${d.qty}계약)</small><br>거래별 손익: ${pnlText}`;
         }
       }
     }
