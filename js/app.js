@@ -2737,6 +2737,8 @@ function updateIntegratedChart(filteredTrades) {
     };
   });
   const scatterStartIndex = 1 + assetSeries.length;
+  const longSeriesIndex = scatterStartIndex;
+  const shortSeriesIndex = scatterStartIndex + 1;
   const closeSeriesIndex = scatterStartIndex + 2;
   const priceValues = seriesData.map(d => d.priceInKRW).filter(v => Number.isFinite(v));
   const priceMin = priceValues.length ? Math.min(...priceValues) : 0;
@@ -2765,7 +2767,15 @@ function updateIntegratedChart(filteredTrades) {
       type: 'line',
       background: 'transparent',
       toolbar: { show: true },
-      zoom: { enabled: true }
+      zoom: { enabled: true },
+      events: {
+        mounted: function(chartCtx) {
+          orientEntryMarkers(chartCtx.el);
+        },
+        updated: function(chartCtx) {
+          orientEntryMarkers(chartCtx.el);
+        }
+      }
     },
     colors: ['#5673ff', '#fbbf24', '#0ea5e9', '#f97316', '#22c55e', '#ef4444', '#facc15'],
     stroke: {
@@ -2790,8 +2800,8 @@ function updateIntegratedChart(filteredTrades) {
       shape: [
         'circle', 
         ...assetSeries.map(() => 'circle'), 
-        'path://M0 -6L4 6H-4Z',        // long triangle
-        'path://M0 6L4 -6H-4Z',        // short triangle
+        'triangle',
+        'triangle',
         'star'
       ],
       strokeWidth: 2
@@ -2808,11 +2818,21 @@ function updateIntegratedChart(filteredTrades) {
       },
       offsetY: -28,
       style: {
-        colors: ['#111'],
+        colors: [function(opts) {
+          const point = seriesData[opts.dataPointIndex];
+          return (point?.individualPnL || 0) >= 0 ? '#86efac' : '#fca5a5';
+        }],
         fontSize: '11px',
         fontWeight: '600'
       },
-      background: { enabled: true, foreColor: '#111', backColor: '#facc15', borderRadius: 4, padding: 5, opacity: 0.95 }
+      background: {
+        enabled: true,
+        foreColor: '#e5e7eb',
+        backColor: '#111827',
+        borderRadius: 4,
+        padding: 5,
+        opacity: 0.95
+      }
     },
     xaxis: { 
       categories: seriesData.map(d => d.x), 
@@ -2867,6 +2887,27 @@ function updateIntegratedChart(filteredTrades) {
       }
     }
   };
+
+  function orientEntryMarkers(chartRoot) {
+    if (!chartRoot) return;
+    const seriesEls = chartRoot.querySelectorAll('.apexcharts-series');
+    const shortSeries = seriesEls[shortSeriesIndex];
+    const longSeries = seriesEls[longSeriesIndex];
+
+    if (longSeries) {
+      longSeries.querySelectorAll('.apexcharts-marker').forEach((marker) => {
+        marker.style.transformOrigin = 'center';
+        marker.style.transform = 'rotate(0deg)';
+      });
+    }
+
+    if (shortSeries) {
+      shortSeries.querySelectorAll('.apexcharts-marker').forEach((marker) => {
+        marker.style.transformOrigin = 'center';
+        marker.style.transform = 'rotate(180deg)';
+      });
+    }
+  }
 
   if (integratedChart) {
     integratedChart.updateOptions(options);

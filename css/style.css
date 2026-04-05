@@ -713,6 +713,13 @@ button {
     font-weight: 600;
 }
 
+#integrated-analysis-chart .apexcharts-data-label {
+    font-family: 'JetBrains Mono', monospace;
+    paint-order: stroke;
+    stroke: rgba(11, 13, 18, 0.9);
+    stroke-width: 3px;
+}
+
 
 /* =========================================================================
    [8] UTILITIES & STATES
