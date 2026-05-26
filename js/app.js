@@ -1983,6 +1983,7 @@ function renderTables(res, margin) {
       }</td>
         <td class="${t.netPct >= 0 ? 'up' : 'down'}">${t.netPct !== 0 ? t.netPct.toFixed(2) + '%' : '-'}</td>
         <td>
+          <button onclick="focusHistoryByPosition('${t.posKey}')" class="btn-outline btn-xs">관련보기</button>
           <button onclick="editTrade(${t.id})" class="btn-edit">수정</button>
           <button onclick="deleteTrade(${t.id})" class="btn-danger">삭제</button>
         </td>
@@ -2596,6 +2597,7 @@ function renderPerformanceReport() {
   })), 'report');
 
   reportRows.forEach(t => {
+    const posKey = `${t.asset}_${t.maturity}`;
     // 1. 기본 손익/수수료 누적
     if (t.cur === "USD") {
       realizedUSD += t.realizedPnlCur;
@@ -2630,6 +2632,7 @@ function renderPerformanceReport() {
         <td style="color:var(--bad)">${t.cur === "USD" ? "$" + t.feeCur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(t.feeCur).toLocaleString()}</td>
         <td><b>${t.cur === "USD" ? "$" + t.netPnlCur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(t.netPnlCur).toLocaleString()}</b></td>
         <td class="${t.netPct >= 0 ? 'up' : 'down'}">${t.netPct.toFixed(2)}%</td>
+        <td><button onclick="focusHistoryByPosition('${posKey}')" class="btn-outline btn-xs">관련보기</button></td>
         <td class="mono" style="font-size:10px; opacity:0.7;">${t.memo || '-'}</td>
       </tr>`;
   });

@@ -7,6 +7,7 @@
   
   <!-- 외부 라이브러리: TradingView 차트 위젯 -->
   <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -327,6 +328,18 @@
         <button class="btn-blue" onclick="renderPerformanceReport()" style="padding: 8px 30px; width: auto;">조회하기</button>
       </div>
 
+          <div class="card" style="margin-bottom: 20px; min-height: 480px; background: linear-gradient(180deg, #141824 0%, #0b0d12 100%);">
+      <h2 style="display: flex; justify-content: space-between;">
+        <span>📈 통합 성과 및 가격 분석 (Price & PnL Insights)</span>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 10px; font-weight: normal; color: var(--muted);">* 단일 상품 필터링 시 가격 추이가 더 정확합니다.</span>
+          <button class="btn-toggle" onclick="toggleCollapse(this)">접기</button>
+        </div>
+      </h2>
+      <div id="integrated-analysis-chart" style="margin-top: 15px;"></div>
+    </div>
+
+
 <div class="summary-grid">
   <!-- 1. 기간 실현손익 (수수료 차감 전) -->
   <div class="stat-card">    <div class="stat-label">기간 실현손익 (Gross, KRW 합산)</div>    <div id="rep-realized" class="stat-val mono">0</div>    <div style="font-size:10px; color:var(--muted)">KRW / USD: <b id="rep-realized-breakdown">₩0 / $0.00</b></div>  </div>
@@ -341,12 +354,15 @@
 </div>
 
       <div class="card">
-        <h2>Period Trade History (기간 내 거래 상세)</h2>
+        <h2 style="display: flex; justify-content: space-between; align-items: center;">
+          <span>Period Trade History (기간 내 거래 상세)</span>
+          <button class="btn-toggle" onclick="toggleCollapse(this)">접기</button>
+        </h2>
         <div class="table-wrap">
           <table id="repDetailTable">
             <thead>
               <tr>
-                <th id="report-sort-date" class="sortable" onclick="toggleTableSort('report', 'date')">날짜</th><th id="report-sort-asset" class="sortable" onclick="toggleTableSort('report', 'asset')">상품</th><th id="report-sort-side" class="sortable" onclick="toggleTableSort('report', 'side')">구분</th><th id="report-sort-price" class="sortable" onclick="toggleTableSort('report', 'price')">가격</th><th id="report-sort-qty" class="sortable" onclick="toggleTableSort('report', 'qty')">수량</th><th id="report-sort-status" class="sortable" onclick="toggleTableSort('report', 'status')">상태</th>
+                <th id="report-sort-inputOrder" class="sortable" onclick="toggleTableSort('report', 'inputOrder')">입력순</th><th id="report-sort-date" class="sortable" onclick="toggleTableSort('report', 'date')">날짜</th><th id="report-sort-asset" class="sortable" onclick="toggleTableSort('report', 'asset')">상품</th><th id="report-sort-side" class="sortable" onclick="toggleTableSort('report', 'side')">구분</th><th id="report-sort-price" class="sortable" onclick="toggleTableSort('report', 'price')">가격</th><th id="report-sort-qty" class="sortable" onclick="toggleTableSort('report', 'qty')">수량</th><th id="report-sort-status" class="sortable" onclick="toggleTableSort('report', 'status')">상태</th>
                 <th id="report-sort-realizedPnlCur" class="sortable" onclick="toggleTableSort('report', 'realizedPnlCur')">실현손익(통화)</th><th id="report-sort-feeCur" class="sortable" onclick="toggleTableSort('report', 'feeCur')">수수료(통화)</th><th id="report-sort-netPnlCur" class="sortable" onclick="toggleTableSort('report', 'netPnlCur')">순손익(통화)</th><th id="report-sort-netPct" class="sortable" onclick="toggleTableSort('report', 'netPct')">손익률</th><th id="report-sort-memo" class="sortable" onclick="toggleTableSort('report', 'memo')">메모</th>
               </tr>
             </thead>
