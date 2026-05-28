@@ -96,3 +96,4 @@ alpha-blotter/
   - Git으로 백업 & 동기화
 - Supabase
   - 로그인 기반 클라우드 동기화 데이터
+  - Data API grants: run `migrations/20260528_explicit_data_api_grants.sql` after creating the Supabase tables.

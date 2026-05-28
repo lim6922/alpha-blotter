@@ -1,5 +1,19 @@
 # History
 
+## 2026-05-28
+
+### Supabase Data API explicit grants migration
+
+- Added `migrations/20260528_explicit_data_api_grants.sql`.
+- The migration grants the `authenticated` role the table privileges required by the app's `supabase-js` sync flow.
+- The migration also grants schema usage and sequence usage/select for public-table inserts that rely on serial or identity defaults.
+
+Impact scope
+- Supabase cloud sync setup and future table-creation workflow.
+
+Verification
+- SQL syntax and grant scope reviewed locally. Supabase SQL Editor execution was not run in this workspace.
+
 `history.md`는 `alpha-blotter`의 개발 히스토리를 누적적으로 관리하는 문서다.
 
 - append-only 원칙을 따른다.
