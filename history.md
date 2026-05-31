@@ -1,5 +1,33 @@
 # History
 
+## 2026-05-31
+
+### Alpha Blotter 포트폴리오 포스팅 드래프트 문서 추가
+
+- `portfolio-alpha-blotter-draft.md` 파일을 신규 추가했다.
+- `dashboard/docs/portfolio-dashboard-draft.md`의 서술 스타일을 참고해, `portfolio-work-template.md` 형식(frontmatter + overview + sections)에 맞춰 Alpha Blotter 프로젝트 소개 초안을 작성했다.
+- 프로젝트 목적, 도메인 규칙(체결/포지션 분리), 구현 구조, 분석 검증 포인트, CSV/Supabase 동기화 및 데이터 안전 원칙을 섹션 단위로 정리했다.
+
+영향 범위
+- 포트폴리오/문서화 자산(신규 드래프트 파일)
+
+검증
+- 템플릿 필드 구조와 섹션 블록 형식 수동 점검 완료
+- 앱 런타임 동작에는 영향 없음
+
+### Alpha Blotter 드래프트에 인수인계용 히든 섹션 추가
+
+- `portfolio-alpha-blotter-draft.md`에 `Section 7`(인수인계용 기술 설계도)을 추가했다.
+- `hidden: true`로 설정해 공개 상세에는 노출되지 않도록 구성했다.
+- 아키텍처 개요, 도메인 계약, `renderAll()` 중심 렌더링 흐름, CSV/Supabase 동기화 경계, 변경 시 점검 항목, 고위험 변경 유형, 운영 원칙을 정리했다.
+
+영향 범위
+- 포트폴리오 드래프트 문서(비공개 인수인계 섹션)
+
+검증
+- 섹션 메타데이터(`id`, `title`, `hidden`) 및 템플릿 형식 수동 점검 완료
+- 앱 런타임 동작 영향 없음
+
 ## 2026-05-28
 
 ### Supabase Data API explicit grants migration
