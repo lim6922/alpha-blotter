@@ -1,5 +1,22 @@
 # History
 
+## 2026-06-08
+
+### Active Positions quick-close button
+
+- Added a `청산` button to each `Active Positions` row.
+- Clicking the button now pre-fills the trade input card with the opposite side, current open quantity, selected asset, maturity, current price, and the active FX rate so the user can record a closing trade immediately.
+- The flow clears edit mode first when needed, keeps the position linked through the existing history focus key, and scrolls back to the input card to finish the entry.
+
+Impact scope
+- `Active Positions` action UI
+- Trade input card autofill flow
+- Position-to-history workflow continuity
+
+Verification
+- Code path reviewed locally.
+- Manual browser verification not run in this workspace.
+
 ## 2026-05-31
 
 ### Alpha Blotter 포트폴리오 포스팅 드래프트 문서 추가
