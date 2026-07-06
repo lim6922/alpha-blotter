@@ -23,6 +23,278 @@ let autoImportDoneUserId = null;
 let authAutoActionsBound = false;
 let integratedChart = null;
 
+const AUTO_BACKUP_DEBOUNCE_MS = 15000;
+const AUTO_BACKUP_LIMIT = 3;
+const BACKUP_STORAGE_PREFIX = 'blotter_backups_v1_';
+
+let activeAuthUser = null;
+let autoBackupTimer = null;
+let autoBackupInFlight = false;
+let autoBackupPendingReason = 'autosave';
+let backupPanelSelectedId = null;
+
+function cloneSerializable(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function getBackupStorageKey(userId) {
+  return `${BACKUP_STORAGE_PREFIX}${userId}`;
+}
+
+function getActiveBackupUser() {
+  return activeAuthUser && activeAuthUser.id ? activeAuthUser : null;
+}
+
+function readBackupList(userId) {
+  if (!userId) return [];
+
+  try {
+    const raw = localStorage.getItem(getBackupStorageKey(userId));
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.warn('failed to read backup list:', error);
+    return [];
+  }
+}
+
+function writeBackupList(userId, backups) {
+  if (!userId) return;
+  localStorage.setItem(getBackupStorageKey(userId), JSON.stringify(backups.slice(0, AUTO_BACKUP_LIMIT)));
+}
+
+function getBackupStateSignature() {
+  return JSON.stringify({
+    local: Number(blotterMeta.lastLocalInputAt) || null,
+    imported: Number(blotterMeta.lastImportedInputAt) || null,
+    exported: Number(blotterMeta.lastExportedInputAt) || null,
+    trades: trades.length,
+    atm: atmRecords.length,
+    assets: Object.keys(master || {}).length
+  });
+}
+
+function buildBackupSnapshot(reason, user) {
+  const currentUser = user || getActiveBackupUser();
+  if (!currentUser?.id) return null;
+
+  return {
+    id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    version: 1,
+    userId: currentUser.id,
+    userEmail: currentUser.email || '',
+    reason,
+    createdAt: Date.now(),
+    stateSignature: getBackupStateSignature(),
+    counts: {
+      trades: trades.length,
+      atmRecords: atmRecords.length,
+      assets: Object.keys(master || {}).length
+    },
+    snapshot: {
+      trades: cloneSerializable(trades),
+      atmRecords: cloneSerializable(atmRecords),
+      master: cloneSerializable(master),
+      capitals: cloneSerializable(capitals),
+      blotterMeta: cloneSerializable(blotterMeta)
+    }
+  };
+}
+
+function storeBackupSnapshot(snapshot) {
+  if (!snapshot?.userId) return false;
+
+  const existing = readBackupList(snapshot.userId);
+  const next = [snapshot, ...existing.filter(item => item?.stateSignature !== snapshot.stateSignature)];
+  writeBackupList(snapshot.userId, next);
+  return true;
+}
+
+function renderBackupPanel(session = null) {
+  const statusEl = document.getElementById('backup-status');
+  const listEl = document.getElementById('backup-list');
+  const detailEl = document.getElementById('backup-detail');
+  const countEl = document.getElementById('backup-count');
+  const user = session?.user || getActiveBackupUser();
+
+  if (!statusEl || !listEl || !detailEl || !countEl) return;
+
+  if (!user?.id) {
+    statusEl.innerText = '로그인 후 자동 백업을 사용할 수 있습니다.';
+    countEl.innerText = '0';
+    listEl.innerHTML = '';
+    detailEl.innerText = '백업 없음';
+    return;
+  }
+
+  const backups = readBackupList(user.id);
+  countEl.innerText = String(backups.length);
+  statusEl.innerText = backups.length
+    ? `최근 ${Math.min(backups.length, AUTO_BACKUP_LIMIT)}개만 보관합니다.`
+    : '백업이 아직 없습니다.';
+
+  const selectedId = listEl.value || backupPanelSelectedId || backups[0]?.id || '';
+  listEl.innerHTML = backups.map(item => {
+    const label = `${fmtTime(item.createdAt)} | ${item.reason || 'backup'} | T:${item.counts?.trades ?? 0} / A:${item.counts?.atmRecords ?? 0} / M:${item.counts?.assets ?? 0}`;
+    return `<option value="${item.id}">${label}</option>`;
+  }).join('');
+
+  if (selectedId) {
+    listEl.value = backups.some(item => item.id === selectedId) ? selectedId : backups[0]?.id || '';
+  }
+
+  const selected = backups.find(item => item.id === listEl.value) || backups[0] || null;
+  backupPanelSelectedId = selected?.id || null;
+
+  if (!selected) {
+    detailEl.innerText = '백업 없음';
+    return;
+  }
+
+  const summaryLines = [
+    `생성: ${fmtTime(selected.createdAt)}`,
+    `사유: ${selected.reason || '-'}`,
+    `저장 사용자: ${selected.userEmail || selected.userId}`,
+    `체결: ${selected.counts?.trades ?? 0}개`,
+    `ATM: ${selected.counts?.atmRecords ?? 0}개`,
+    `종목: ${selected.counts?.assets ?? 0}개`
+  ];
+  detailEl.innerText = summaryLines.join(' | ');
+}
+
+function saveLocalSnapshot(reason = 'autosave') {
+  const user = getActiveBackupUser();
+  if (!user?.id || autoBackupInFlight) return false;
+
+  const snapshot = buildBackupSnapshot(reason, user);
+  if (!snapshot) return false;
+
+  const backups = readBackupList(user.id);
+  if (backups[0]?.stateSignature === snapshot.stateSignature) {
+    renderBackupPanel();
+    return false;
+  }
+
+  autoBackupInFlight = true;
+  try {
+    storeBackupSnapshot(snapshot);
+    renderBackupPanel();
+    return true;
+  } finally {
+    autoBackupInFlight = false;
+  }
+}
+
+function scheduleAutoBackup(reason = 'autosave') {
+  autoBackupPendingReason = reason;
+
+  if (autoBackupTimer) {
+    clearTimeout(autoBackupTimer);
+  }
+
+  autoBackupTimer = setTimeout(() => {
+    autoBackupTimer = null;
+    saveLocalSnapshot(autoBackupPendingReason);
+  }, AUTO_BACKUP_DEBOUNCE_MS);
+}
+
+function createImmediateBackup(reason = 'manual') {
+  if (autoBackupTimer) {
+    clearTimeout(autoBackupTimer);
+    autoBackupTimer = null;
+  }
+
+  return saveLocalSnapshot(reason);
+}
+
+function loadSelectedBackup() {
+  const selectEl = document.getElementById('backup-list');
+  const user = getActiveBackupUser();
+  if (!selectEl || !user?.id) return null;
+
+  const backups = readBackupList(user.id);
+  return backups.find(item => item.id === selectEl.value) || null;
+}
+
+function applyBackupSnapshot(snapshot) {
+  if (!snapshot?.snapshot) return false;
+
+  trades = cloneSerializable(snapshot.snapshot.trades || []);
+  atmRecords = cloneSerializable(snapshot.snapshot.atmRecords || []);
+  master = cloneSerializable(snapshot.snapshot.master || {});
+  capitals = cloneSerializable(snapshot.snapshot.capitals || { dom: 0, ovs: 0 });
+  blotterMeta = cloneSerializable(snapshot.snapshot.blotterMeta || blotterMeta);
+
+  localStorage.setItem('blotter_trades_v96', JSON.stringify(trades));
+  localStorage.setItem('blotter_atm_v96', JSON.stringify(atmRecords));
+  localStorage.setItem('blotter_master_v96', JSON.stringify(master));
+  localStorage.setItem('blotter_capitals_v96', JSON.stringify(capitals));
+  localStorage.setItem('blotter_meta_v96', JSON.stringify(blotterMeta));
+
+  loadCapitals();
+  renderMaster();
+  initAssetSelect();
+  renderATM();
+  renderAll();
+  updateSyncHeader();
+  renderBackupPanel();
+
+  return true;
+}
+
+function restoreSelectedBackup() {
+  const user = getActiveBackupUser();
+  if (!user?.id) return alert('로그인 후 복구할 수 있습니다.');
+
+  const snapshot = loadSelectedBackup();
+  if (!snapshot) return alert('복구할 백업을 선택하세요.');
+
+  const confirmed = confirm(`선택한 백업으로 현재 로컬 데이터를 덮어씁니다.\n\n생성 시점: ${fmtTime(snapshot.createdAt)}\n사유: ${snapshot.reason || '-'}\n\n현재 상태는 복구 전에 한 번 더 백업됩니다.`);
+  if (!confirmed) return;
+
+  createImmediateBackup('before_restore');
+  applyBackupSnapshot(snapshot);
+
+  blotterMeta.lastLocalInputAt = Date.now();
+  saveMeta();
+  updateSyncHeader();
+}
+
+function deleteSelectedBackup() {
+  const user = getActiveBackupUser();
+  if (!user?.id) return alert('로그인 후 사용할 수 있습니다.');
+
+  const selectEl = document.getElementById('backup-list');
+  if (!selectEl?.value) return alert('삭제할 백업을 선택하세요.');
+
+  const backups = readBackupList(user.id);
+  const next = backups.filter(item => item.id !== selectEl.value);
+  writeBackupList(user.id, next);
+  backupPanelSelectedId = next[0]?.id || null;
+  renderBackupPanel();
+}
+
+function refreshBackupPanel() {
+  renderBackupPanel();
+}
+
+function manualBackupNow() {
+  const user = getActiveBackupUser();
+  if (!user?.id) {
+    alert('로그인된 계정의 백업만 저장할 수 있습니다.');
+    return;
+  }
+
+  const ok = createImmediateBackup('manual');
+  if (!ok) {
+    alert('이미 최신 상태라 새 백업이 필요하지 않습니다.');
+    return;
+  }
+
+  renderBackupPanel();
+  alert('백업을 저장했습니다.');
+}
+
 function applySyncAuthState(session = null, options = {}) {
   const { keepImportState = false } = options;
   const statusEl = document.getElementById('sync-auth-status');
@@ -31,6 +303,7 @@ function applySyncAuthState(session = null, options = {}) {
   if (!statusEl) return;
 
   const user = session?.user || null;
+  activeAuthUser = user;
 
   if (user) {
     const email = user.email || 'Google User';
@@ -62,6 +335,7 @@ function applySyncAuthState(session = null, options = {}) {
   statusEl.classList.add('sync-auth-off');
 
   if (btnEl) btnEl.innerText = '동기화 로그인';
+  renderBackupPanel(null);
 }
 
 function setAutoSyncStatus(text, className = '') {
@@ -131,6 +405,10 @@ function bindAuthAutoActions() {
       autoImportInFlight = false;
       autoImportDoneUserId = null;
       autoImportFromCloudDone = false;
+      if (autoBackupTimer) {
+        clearTimeout(autoBackupTimer);
+        autoBackupTimer = null;
+      }
       applySyncAuthState(null);
       return;
     }
@@ -377,6 +655,7 @@ function saveCapitals() {
   capitals.dom = parseFloat(document.getElementById('capital-dom').value) || 0;
   capitals.ovs = parseFloat(document.getElementById('capital-ovs').value) || 0;
   localStorage.setItem('blotter_capitals_v96', JSON.stringify(capitals));
+  markLocalDirty('capital-save');
   renderAll();
 }
 function loadCapitals() {
@@ -441,6 +720,7 @@ async function updateSyncAuthUI(sessionOverride = undefined) {
     statusEl.classList.add('sync-auth-off');
 
     if (btnEl) btnEl.innerText = '동기화 로그인';
+    renderBackupPanel(null);
     return;
   }
 
@@ -652,7 +932,7 @@ function parseAndApplyCSV(text, sourceLabel = "CSV") {
 기존 데이터를 덮어쓰시겠습니까?`;
   if (!confirm(msg)) return false;
 
-  localStorage.setItem('blotter_backup_before_import', localStorage.getItem('blotter_trades_v96'));
+  createImmediateBackup('before_csv_import');
 
   trades = newTrades;
   atmRecords = newATM;
@@ -674,6 +954,7 @@ function parseAndApplyCSV(text, sourceLabel = "CSV") {
   blotterMeta.lastLocalInputAt = csvLocalInputAt || Date.now();
   saveMeta();
   updateSyncHeader();
+  scheduleAutoBackup('csv-import');
 
   alert(`${sourceLabel} 가져오기가 완료되었습니다.`);
   return true;
@@ -792,6 +1073,9 @@ function toSafeIntegerId(value) {
 async function exportToCloudInternal({ user = null, skipConfirm = false, silent = false, source = 'manual' } = {}) {
   const currentUser = user || await getCurrentUserOrAlert();
   if (!currentUser) return false;
+
+  activeAuthUser = currentUser;
+  createImmediateBackup('before_cloud_export');
 
   if (!skipConfirm) {
     const exportSummaryMsg = `현재 데이터를 원격 동기화 데이터로 저장합니다:
@@ -948,6 +1232,9 @@ async function exportToCloud() {
 async function importFromCloudInternal({ user = null, skipConfirm = false, silent = false, source = 'manual' } = {}) {
   const currentUser = user || await getCurrentUserOrAlert();
   if (!currentUser) return false;
+
+  activeAuthUser = currentUser;
+  createImmediateBackup('before_cloud_import');
 
   try {
     // 1) trades 조회
@@ -2051,10 +2338,7 @@ function deleteTrade(id) {
 
   trades = trades.filter(t => t.id !== id);
   localStorage.setItem('blotter_trades_v96', JSON.stringify(trades));
-
-  blotterMeta.lastLocalInputAt = Date.now();
-  saveMeta();
-  updateSyncHeader();
+  markLocalDirty('trade-delete');
 
   renderAll();
 }
@@ -2100,9 +2384,7 @@ function addOrUpdateTrade() {
   localStorage.setItem('blotter_trades_v96', JSON.stringify(trades));
 
   // ✅ 업데이트 버튼을 눌렀다는 "의미적 완료 시점"
-  blotterMeta.lastLocalInputAt = Date.now();
-  saveMeta();
-  updateSyncHeader();
+  markLocalDirty('trade-save');
 
   // UI 정리는 그 다음
   cancelEdit();
@@ -2266,11 +2548,7 @@ function addOrUpdateAsset() {
 
   master[id] = m;
   localStorage.setItem('blotter_master_v96', JSON.stringify(master));
-
-
-  blotterMeta.lastLocalInputAt = Date.now();
-  saveMeta();
-  updateSyncHeader();
+  markLocalDirty('asset-save');
 
   alert(editingAsset ? "수정되었습니다." : "추가되었습니다.");
 
@@ -2362,16 +2640,14 @@ function removeAsset(id) {
   renderMaster();
   initAssetSelect();
   renderAll();
-
-  blotterMeta.lastLocalInputAt = Date.now();
-  saveMeta();
-  updateSyncHeader();
+  markLocalDirty('asset-delete');
 }
 
 function updateM(a, f, v) {
   const numFields = new Set(["tick", "tickVal", "fee", "initMargin", "maintMargin", "multiplier"]);
   master[a][f] = numFields.has(f) ? parseFloat(v) : v;
   localStorage.setItem('blotter_master_v96', JSON.stringify(master));
+  markLocalDirty('asset-update');
   onAssetChange();
   renderAll();
 }
@@ -2481,16 +2757,19 @@ function runCalc() {
 }
 
 
-function markLocalDirty() {
+function markLocalDirty(reason = 'autosave') {
   blotterMeta.lastLocalInputAt = Date.now();
   saveMeta();
   updateSyncHeader();
+  scheduleAutoBackup(reason);
 }
 
 
 
 function clearAllData() {
   if (!confirm("⚠️ 모든 데이터와 설정을 초기화합니다. 계속할까요?")) return;
+
+  createImmediateBackup('before_clear_all');
 
   localStorage.removeItem('blotter_trades_v96');
   localStorage.removeItem('blotter_mtm_v96');
@@ -2996,9 +3275,7 @@ function addATMRecord() {
 
   document.getElementById('atm-amount').value = "";
   document.getElementById('atm-memo').value = "";
-  blotterMeta.lastLocalInputAt = Date.now();
-  saveMeta();
-  updateSyncHeader();
+  markLocalDirty('atm-save');
 
 }
 
@@ -3026,10 +3303,7 @@ function deleteATM(id) {
 
   atmRecords = atmRecords.filter(r => r.id !== id);
   localStorage.setItem('blotter_atm_v96', JSON.stringify(atmRecords));
-
-  blotterMeta.lastLocalInputAt = Date.now();
-  saveMeta();
-  updateSyncHeader();
+  markLocalDirty('atm-delete');
 
   renderATM();
   renderAll();

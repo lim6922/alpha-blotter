@@ -503,6 +503,12 @@ button {
     margin-right: 4px;
 }
 
+.btn-close {
+    background: #2a1f0d;
+    color: #fbbf24;
+    border: 1px solid #5a4720;
+}
+
 .btn-group-half {
     display: flex;
     gap: 8px;

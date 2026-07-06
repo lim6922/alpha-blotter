@@ -1878,6 +1878,45 @@ function clearHistoryFocus() {
   renderAll();
 }
 
+function startCloseTradeFromPosition(positionKey) {
+  const res = calculateEngine();
+  const position = res.openPos.find(p => p.key === positionKey);
+  if (!position) {
+    alert('Active position not found.');
+    return;
+  }
+
+  if (editingId) {
+    cancelEdit();
+  }
+
+  const closeSide = position.qty > 0 ? 'Sell' : 'Buy';
+  const defaultPrice = Number(position.currPrice) || Number(position.avgPrice) || '';
+  const today = new Date().toISOString().split('T')[0];
+  const assetMeta = master[position.asset] || {};
+
+  historyFocusKey = position.key;
+
+  document.getElementById('tradeDate').value = today;
+  document.getElementById('side').value = closeSide;
+  document.getElementById('asset').value = position.asset;
+  document.getElementById('maturityDate').value = position.maturity || today;
+  document.getElementById('qty').value = Math.abs(position.qty);
+  document.getElementById('price').value = defaultPrice;
+  document.getElementById('stopLoss').value = '';
+  document.getElementById('fxRate').value = assetMeta.cur === 'KRW' ? 1 : Number(globalFX).toFixed(2);
+  document.getElementById('memoInput').value = '';
+
+  syncDTEFromMaturity();
+  updateTVChart();
+  renderAll();
+
+  const inputCard = document.getElementById('inputCard');
+  if (inputCard) {
+    inputCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
 function renderTables(res, margin) {
   const openBody = document.querySelector('#openPosTable tbody');
   const histBody = document.querySelector('#historyTable tbody');
@@ -1925,6 +1964,7 @@ function renderTables(res, margin) {
 잔존 lot: ${residualSummary}">${memoSummary}</td>
         <td>
           <button onclick="focusHistoryByPosition('${p.key}')" class="btn-outline btn-xs">관련 보기</button>
+          <button onclick="startCloseTradeFromPosition('${p.key}')" class="btn-close btn-xs">청산</button>
         </td>
       </tr>
     `;
@@ -1983,6 +2023,7 @@ function renderTables(res, margin) {
       }</td>
         <td class="${t.netPct >= 0 ? 'up' : 'down'}">${t.netPct !== 0 ? t.netPct.toFixed(2) + '%' : '-'}</td>
         <td>
+          <button onclick="focusHistoryByPosition('${t.posKey}')" class="btn-outline btn-xs">관련보기</button>
           <button onclick="editTrade(${t.id})" class="btn-edit">수정</button>
           <button onclick="deleteTrade(${t.id})" class="btn-danger">삭제</button>
         </td>
@@ -2596,6 +2637,7 @@ function renderPerformanceReport() {
   })), 'report');
 
   reportRows.forEach(t => {
+    const posKey = `${t.asset}_${t.maturity}`;
     // 1. 기본 손익/수수료 누적
     if (t.cur === "USD") {
       realizedUSD += t.realizedPnlCur;
@@ -2630,6 +2672,7 @@ function renderPerformanceReport() {
         <td style="color:var(--bad)">${t.cur === "USD" ? "$" + t.feeCur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(t.feeCur).toLocaleString()}</td>
         <td><b>${t.cur === "USD" ? "$" + t.netPnlCur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(t.netPnlCur).toLocaleString()}</b></td>
         <td class="${t.netPct >= 0 ? 'up' : 'down'}">${t.netPct.toFixed(2)}%</td>
+        <td><button onclick="focusHistoryByPosition('${posKey}')" class="btn-outline btn-xs">관련보기</button></td>
         <td class="mono" style="font-size:10px; opacity:0.7;">${t.memo || '-'}</td>
       </tr>`;
   });

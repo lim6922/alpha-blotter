@@ -97,3 +97,9 @@ alpha-blotter/
 - Supabase
   - 로그인 기반 클라우드 동기화 데이터
   - Data API grants: run `migrations/20260528_explicit_data_api_grants.sql` after creating the Supabase tables.
+
+## 자동 백업
+
+- 로그인한 사용자 기준으로 최근 3개의 로컬 백업 스냅샷을 자동 보관합니다.
+- CSV 가져오기, 클라우드 가져오기, 전체 삭제 같은 덮어쓰기 작업 전에 복구용 백업을 먼저 남깁니다.
+- 설정 탭에서 백업 목록을 확인하고 복구하거나 삭제할 수 있습니다.
