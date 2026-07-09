@@ -32,6 +32,8 @@ let autoBackupTimer = null;
 let autoBackupInFlight = false;
 let autoBackupPendingReason = 'autosave';
 let backupPanelSelectedId = null;
+let availContractsPreviewTimer = null;
+const AVAIL_CONTRACTS_PREVIEW_DEBOUNCE_MS = 150;
 
 function cloneSerializable(value) {
   return JSON.parse(JSON.stringify(value));
@@ -2820,7 +2822,14 @@ function updateAvailContracts(res = null, margin = null) {
 }
 
 function updateAvailContractsOnPrice() { // on price input
-  renderAll();
+  if (availContractsPreviewTimer) {
+    clearTimeout(availContractsPreviewTimer);
+  }
+
+  availContractsPreviewTimer = setTimeout(() => {
+    availContractsPreviewTimer = null;
+    updateAvailContracts();
+  }, AVAIL_CONTRACTS_PREVIEW_DEBOUNCE_MS);
 }
 
 /**
