@@ -593,11 +593,11 @@ const tableSortState = {
 const tableSortLabels = {
   history: {
     inputOrder: '입력순', date: '일자', asset: '상품', side: '구분', price: '가격', qty: '수량',
-    status: '상태', stopLoss: '스탑', realizedPnlCur: '실현손익(통화)', feeCur: '수수료(통화)', unrealizedPnlCur: '미실현손익(통화)', positionPnlCur: '포지션누적(만기)', memo: '메모'
+    status: '상태', stopLoss: '스탑', realizedPnlCur: '실현손익(통화)', feeCur: '수수료(통화)', unrealizedPnlCur: '미실현손익(행손익/잔존손익)', positionPnlCur: '포지션누적(만기)', memo: '메모'
   },
   report: {
     inputOrder: '입력순', date: '날짜', asset: '상품', side: '구분', price: '가격', qty: '수량', status: '상태',
-    realizedPnlCur: '실현손익(통화)', feeCur: '수수료(통화)', unrealizedPnlCur: '미실현손익(통화)', positionPnlCur: '포지션누적(만기)', memo: '메모'
+    realizedPnlCur: '실현손익(통화)', feeCur: '수수료(통화)', unrealizedPnlCur: '미실현손익(행손익/잔존손익)', positionPnlCur: '포지션누적(만기)', memo: '메모'
   }
 };
 
@@ -1547,6 +1547,38 @@ function formatPnlCell(value, cur) {
     ? "$" + value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : Math.round(value).toLocaleString();
 }
+function pnlClass(value) {
+  if (!Number.isFinite(value) || value === 0) return 'muted';
+  return value > 0 ? 'up' : 'down';
+}
+function resolveMarkPrice(asset, maturity, fallbackPrice = 0) {
+  const key = `${asset}_${maturity}`;
+  const exact = safeNum(mtmPrices[key], NaN);
+  if (Number.isFinite(exact)) return exact;
+
+  const last = safeNum(mtmPrices[`LAST_${asset}`], NaN);
+  if (Number.isFinite(last)) return last;
+
+  return safeNum(fallbackPrice, 0);
+}
+function calcTradeUnrealizedPnlCur(trade, markPrice) {
+  const m = master[trade.asset] || { tick: 1, tickVal: 0, cur: trade.cur || 'KRW' };
+  const entryPrice = safeNum(trade.price, 0);
+  const currentPrice = safeNum(markPrice, entryPrice);
+  const qty = safeNum(trade.qty, 0);
+  if (!entryPrice || !currentPrice || !qty || !m.tick || !m.tickVal) return 0;
+
+  const dir = isLongSide(trade.side) ? 1 : -1;
+  const pointMove = (currentPrice - entryPrice) * dir;
+  return (pointMove / m.tick) * m.tickVal * qty;
+}
+function formatPnlBreakdownCell(rowValue, residualValue, cur) {
+  return `
+    <div style="display:flex; flex-direction:column; gap:2px; line-height:1.15;">
+      <div class="${pnlClass(rowValue)}">행 ${formatPnlCell(rowValue, cur)}</div>
+      <div class="${pnlClass(residualValue)}" style="opacity:0.9;">잔 ${formatPnlCell(residualValue, cur)}</div>
+    </div>`;
+}
 function compareSortValues(a, b) {
   if (a == null && b == null) return 0;
   if (a == null) return 1;
@@ -2237,6 +2269,7 @@ function renderTables(res, margin) {
     const entry = positionPnlMap.get(p.key) || { cur: p.cur || 'KRW', realized: 0, unrealized: 0, positionPnl: 0 };
     entry.cur = p.cur || entry.cur;
     entry.unrealized = safeNum(p.uPnl, 0);
+    entry.markPrice = safeNum(p.currPrice, 0);
     positionPnlMap.set(p.key, entry);
   });
 
@@ -2291,7 +2324,9 @@ function renderTables(res, margin) {
     const residualQty = res.residualTradeQtyMap[t.id] || 0;
     const tradeStatus = t.isCloseTrade ? 'CLOSE' : 'OPEN';
     const contributesToOpen = residualQty > 0;
-    const pnlSummary = positionPnlMap.get(posKey) || { cur: t.cur || 'KRW', realized: 0, unrealized: 0, positionPnl: 0 };
+    const pnlSummary = positionPnlMap.get(posKey) || { cur: t.cur || 'KRW', realized: 0, unrealized: 0, positionPnl: 0, markPrice: null };
+    const markPrice = pnlSummary.markPrice || resolveMarkPrice(t.asset, t.maturity, t.price);
+    const rowPnlCur = calcTradeUnrealizedPnlCur(t, markPrice);
     return {
       ...t,
       posKey,
@@ -2300,7 +2335,8 @@ function renderTables(res, margin) {
       tradeStatus,
       contributesToOpen,
       realizedPnlCur: t.realizedPnlCur,
-      unrealizedPnlCur: pnlSummary.unrealized,
+      unrealizedPnlCur: rowPnlCur,
+      residualPnlCur: pnlSummary.unrealized,
       positionPnlCur: pnlSummary.positionPnl,
       inputOrder: inputOrderMap.get(t.id) || 0,
       status: `${tradeStatus}_${isSquared ? 'SQUARED' : 'OPEN'}_${residualQty > 0 ? 'LIVE' : 'FLAT'}`
@@ -2318,7 +2354,9 @@ function renderTables(res, margin) {
     `;
     const isEditingThis = (t.id === editingId);
     const isRelatedToFocus = (t.posKey === historyFocusKey);
-    const pnlSummary = positionPnlMap.get(t.posKey) || { cur: t.cur || 'KRW', realized: 0, unrealized: 0, positionPnl: 0 };
+    const pnlSummary = positionPnlMap.get(t.posKey) || { cur: t.cur || 'KRW', realized: 0, unrealized: 0, positionPnl: 0, markPrice: null };
+    const markPrice = pnlSummary.markPrice || resolveMarkPrice(t.asset, t.maturity, t.price);
+    const rowPnlCur = calcTradeUnrealizedPnlCur(t, markPrice);
     const rowClass = [
       isEditingThis ? 'edit-active-row' : '',
       isRelatedToFocus ? 'history-focus-row' : '',
@@ -2337,7 +2375,7 @@ function renderTables(res, margin) {
         <td>${t.stopLoss ?? '-'}</td>
         <td class="${t.realizedPnlCur >= 0 ? 'up' : 'down'}">${formatPnlCell(t.realizedPnlCur, t.cur)}</td>
         <td style="color:var(--bad)">${t.feeCur !== 0 ? formatPnlCell(t.feeCur, t.cur) : '-'}</td>
-        <td class="${pnlSummary.unrealized >= 0 ? 'up' : 'down'}">${formatPnlCell(pnlSummary.unrealized, pnlSummary.cur)}</td>
+        <td>${formatPnlBreakdownCell(rowPnlCur, pnlSummary.unrealized, pnlSummary.cur)}</td>
         <td class="${pnlSummary.positionPnl >= 0 ? 'up' : 'down'}">${formatPnlCell(pnlSummary.positionPnl, pnlSummary.cur)}</td>
         <td>
           <button onclick="focusHistoryByPosition('${t.posKey}')" class="btn-outline btn-xs">관련보기</button>
@@ -2972,6 +3010,7 @@ function renderPerformanceReport() {
     const entry = reportPnlMap.get(p.key) || { cur: p.cur || 'KRW', realized: 0, unrealized: 0, positionPnl: 0 };
     entry.cur = p.cur || entry.cur;
     entry.unrealized = safeNum(p.uPnl, 0);
+    entry.markPrice = safeNum(p.currPrice, 0);
     reportPnlMap.set(p.key, entry);
   });
   reportPnlMap.forEach(entry => {
@@ -2982,7 +3021,8 @@ function renderPerformanceReport() {
     ...t,
     status: t.currentNetQty === 0 ? 'SQUARED' : (t.isCloseTrade ? 'CLOSE' : 'OPEN'),
     realizedPnlCur: t.realizedPnlCur,
-    unrealizedPnlCur: reportPnlMap.get(`${t.asset}_${t.maturity}`)?.unrealized || 0,
+    unrealizedPnlCur: calcTradeUnrealizedPnlCur(t, (reportPnlMap.get(`${t.asset}_${t.maturity}`)?.markPrice || resolveMarkPrice(t.asset, t.maturity, t.price))),
+    residualPnlCur: reportPnlMap.get(`${t.asset}_${t.maturity}`)?.unrealized || 0,
     positionPnlCur: reportPnlMap.get(`${t.asset}_${t.maturity}`)?.positionPnl || safeNum(t.realizedPnlCur, 0)
   })), 'report');
 
@@ -3009,6 +3049,8 @@ function renderPerformanceReport() {
 
     // 3. 테이블 행 추가
     const statusLabel = t.status;
+    const rowPnlCur = t.unrealizedPnlCur;
+    const residualPnlCur = t.residualPnlCur ?? 0;
     body.innerHTML += `
       <tr>
         <td>${t.inputOrder || '-'}</td>
@@ -3020,7 +3062,7 @@ function renderPerformanceReport() {
         <td><span class="pill">${statusLabel}</span></td>
         <td class="${t.realizedPnlCur >= 0 ? 'up' : 'down'}">${formatPnlCell(t.realizedPnlCur, t.cur)}</td>
         <td style="color:var(--bad)">${t.feeCur !== 0 ? formatPnlCell(t.feeCur, t.cur) : '-'}</td>
-        <td class="${t.unrealizedPnlCur >= 0 ? 'up' : 'down'}">${formatPnlCell(t.unrealizedPnlCur, t.cur)}</td>
+        <td>${formatPnlBreakdownCell(rowPnlCur, residualPnlCur, t.cur)}</td>
         <td class="${t.positionPnlCur >= 0 ? 'up' : 'down'}">${formatPnlCell(t.positionPnlCur, t.cur)}</td>
         <td><button onclick="focusHistoryByPosition('${posKey}')" class="btn-outline btn-xs">관련보기</button></td>
         <td class="mono" style="font-size:10px; opacity:0.7;">${t.memo || '-'}</td>

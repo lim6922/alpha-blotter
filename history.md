@@ -245,3 +245,18 @@ Verification
 검증
 - `node --check js/app.js` 통과
 - `node --check js/supabase.js` 통과
+## 2026-07-21
+
+### 미실현손익 표기 및 계산 기준 분리
+
+- Trade History와 Performance Report의 `미실현손익` 표기를 `미실현손익(행손익/잔존손익)`으로 바꿨다.
+- 행손익은 각 행의 체결가와 현재가를 비교해 계산하고, 잔존손익은 평균가와 현재가를 비교해 계산하도록 분리했다.
+- history/report의 미실현손익 셀은 행손익과 잔존손익을 함께 보여주도록 바꿨다.
+
+영향 범위
+- `js/app.js` 손익 계산 및 history/report 렌더링
+- `index.html` 표 헤더
+- `AGENTS.md` 계산 규칙과 검증 기준
+
+검증
+- 수동 UI 확인 필요
