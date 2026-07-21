@@ -194,7 +194,7 @@
           <table id="historyTable">
             <thead>
               <tr>
-                <th id="history-sort-inputOrder" class="sortable" onclick="toggleTableSort('history', 'inputOrder')">입력순</th><th id="history-sort-date" class="sortable" onclick="toggleTableSort('history', 'date')">일자</th><th id="history-sort-asset" class="sortable" onclick="toggleTableSort('history', 'asset')">상품</th><th id="history-sort-side" class="sortable" onclick="toggleTableSort('history', 'side')">구분</th><th id="history-sort-price" class="sortable" onclick="toggleTableSort('history', 'price')">가격</th><th id="history-sort-qty" class="sortable" onclick="toggleTableSort('history', 'qty')">수량</th><th id="history-sort-status" class="sortable" onclick="toggleTableSort('history', 'status')">상태</th>
+                <th id="history-sort-inputOrder" class="sortable" onclick="toggleTableSort('history', 'inputOrder')">입력순</th><th id="history-sort-date" class="sortable" onclick="toggleTableSort('history', 'date')">일자</th><th id="history-sort-asset" class="sortable" onclick="toggleTableSort('history', 'asset')">상품/만기</th><th id="history-sort-side" class="sortable" onclick="toggleTableSort('history', 'side')">구분</th><th id="history-sort-price" class="sortable" onclick="toggleTableSort('history', 'price')">가격</th><th id="history-sort-qty" class="sortable" onclick="toggleTableSort('history', 'qty')">수량</th><th id="history-sort-status" class="sortable" onclick="toggleTableSort('history', 'status')">상태</th>
                 <th id="history-sort-stopLoss" class="sortable" onclick="toggleTableSort('history', 'stopLoss')">스탑</th><th id="history-sort-netPnlCur" class="sortable" onclick="toggleTableSort('history', 'netPnlCur')">순손익(통화)</th><th id="history-sort-netPct" class="sortable" onclick="toggleTableSort('history', 'netPct')">손익률</th><th>액션</th><th id="history-sort-memo" class="sortable" onclick="toggleTableSort('history', 'memo')">메모</th>
               </tr>
             </thead>
@@ -325,6 +325,7 @@
         <div class="filter-item"><label>조회 시작일</label><input type="date" id="repStartDate"></div>
         <div class="filter-item"><label>조회 종료일</label><input type="date" id="repEndDate"></div>
         <div class="filter-item"><label>상품</label><select id="repAssetFilter" onchange="renderPerformanceReport()"><option value="ALL">전체 상품</option></select></div>
+        <div class="filter-item"><label>만기일자</label><select id="repMaturityFilter" onchange="renderPerformanceReport()"><option value="ALL">전체 만기일자</option></select></div>
         <button class="btn-blue" onclick="renderPerformanceReport()" style="padding: 8px 30px; width: auto;">조회하기</button>
       </div>
 
@@ -362,7 +363,7 @@
           <table id="repDetailTable">
             <thead>
               <tr>
-                <th id="report-sort-inputOrder" class="sortable" onclick="toggleTableSort('report', 'inputOrder')">입력순</th><th id="report-sort-date" class="sortable" onclick="toggleTableSort('report', 'date')">날짜</th><th id="report-sort-asset" class="sortable" onclick="toggleTableSort('report', 'asset')">상품</th><th id="report-sort-side" class="sortable" onclick="toggleTableSort('report', 'side')">구분</th><th id="report-sort-price" class="sortable" onclick="toggleTableSort('report', 'price')">가격</th><th id="report-sort-qty" class="sortable" onclick="toggleTableSort('report', 'qty')">수량</th><th id="report-sort-status" class="sortable" onclick="toggleTableSort('report', 'status')">상태</th>
+                <th id="report-sort-inputOrder" class="sortable" onclick="toggleTableSort('report', 'inputOrder')">입력순</th><th id="report-sort-date" class="sortable" onclick="toggleTableSort('report', 'date')">날짜</th><th id="report-sort-asset" class="sortable" onclick="toggleTableSort('report', 'asset')">상품/만기</th><th id="report-sort-side" class="sortable" onclick="toggleTableSort('report', 'side')">구분</th><th id="report-sort-price" class="sortable" onclick="toggleTableSort('report', 'price')">가격</th><th id="report-sort-qty" class="sortable" onclick="toggleTableSort('report', 'qty')">수량</th><th id="report-sort-status" class="sortable" onclick="toggleTableSort('report', 'status')">상태</th>
                 <th id="report-sort-realizedPnlCur" class="sortable" onclick="toggleTableSort('report', 'realizedPnlCur')">실현손익(통화)</th><th id="report-sort-feeCur" class="sortable" onclick="toggleTableSort('report', 'feeCur')">수수료(통화)</th><th id="report-sort-netPnlCur" class="sortable" onclick="toggleTableSort('report', 'netPnlCur')">순손익(통화)</th><th id="report-sort-netPct" class="sortable" onclick="toggleTableSort('report', 'netPct')">손익률</th><th>액션</th><th id="report-sort-memo" class="sortable" onclick="toggleTableSort('report', 'memo')">메모</th>
               </tr>
             </thead>

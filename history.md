@@ -1,5 +1,47 @@
 # History
 
+## 2026-07-21
+
+### Performance Report 조회 옵션에 만기일자 필터 추가
+
+- Performance Report 조회 옵션에 `만기일자` 필터를 추가했다.
+- `상품` 필터와 함께 적용되도록 해서, 조회 기간 안에서 상품/만기 조합을 더 좁혀볼 수 있게 했다.
+
+영향 범위
+- `index.html` Performance Report 필터 UI
+- `js/app.js` Performance Report 필터 초기화 및 조회 필터링
+
+검증
+- 코드 수정만 반영했고 브라우저 수동 검증은 아직 하지 않았다.
+
+## 2026-07-21
+
+### Period Trade History 상품 표시를 상품/만기로 변경
+
+- Period Trade History의 상품 컬럼 헤더를 `상품/만기`로 바꿨다.
+- 각 행은 `상품`과 `만기`를 함께 보여주도록 렌더링을 수정했다.
+
+영향 범위
+- `index.html` Period Trade History 헤더
+- `js/app.js` Period Trade History 행 렌더링
+
+검증
+- 코드 수정만 반영했고 브라우저 수동 검증은 아직 하지 않았다.
+
+## 2026-07-21
+
+### Trade History 상품 표시를 상품/만기로 변경
+
+- Trade History의 상품 컬럼 헤더를 `상품/만기`로 바꿨다.
+- 각 행은 `상품`과 `만기`를 함께 보여주도록 렌더링을 수정했다.
+
+영향 범위
+- `index.html` Trade History 헤더
+- `js/app.js` Trade History 행 렌더링
+
+검증
+- 코드 수정만 반영했고 브라우저 수동 검증은 아직 하지 않았다.
+
 ## 2026-07-09
 
 ### 체결 입력창 가격 oninput 렌더 지연 완화

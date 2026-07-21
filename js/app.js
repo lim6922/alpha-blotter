@@ -2298,7 +2298,7 @@ function renderTables(res, margin) {
       <tr class="${rowClass}">
         <td><span class="pill pill-order">#${t.inputOrder || '-'}</span></td>
         <td>${t.date}</td>
-        <td>${t.asset}</td>
+        <td><b>${t.asset}</b><br><small style="color:var(--muted)">${t.maturity || '-'}</small></td>
         <td>${sidePill(t.side)}</td>
         <td>${t.price}</td>
         <td>${t.qty}</td>
@@ -2681,6 +2681,17 @@ function initReportAssetFilter(sourceTrades = trades) {
   reportSelect.value = assetIds.includes(prev) ? prev : "ALL";
 }
 // 전역 변수에 위젯 저장 객체 추가
+function initReportMaturityFilter(sourceTrades = trades) {
+  const reportSelect = document.getElementById("repMaturityFilter");
+  if (!reportSelect) return;
+
+  const prev = reportSelect.value || "ALL";
+  const maturities = Array.from(new Set((sourceTrades || []).map(t => t.maturity).filter(Boolean))).sort();
+
+  reportSelect.innerHTML = `<option value="ALL">전체 만기일자</option>`;
+  maturities.forEach(maturity => reportSelect.innerHTML += `<option value="${maturity}">${maturity}</option>`);
+  reportSelect.value = maturities.includes(prev) ? prev : "ALL";
+}
 let tvWidget = null;
 
 function updateTVChart() {
@@ -2890,11 +2901,13 @@ function renderPerformanceReport() {
   const processed = res.processed;
   const inputOrderMap = getTradeInputOrderMap(trades);
   initReportAssetFilter(processed);
+  initReportMaturityFilter(processed);
   const assetFilter = document.getElementById("repAssetFilter")?.value || "ALL";
+  const maturityFilter = document.getElementById("repMaturityFilter")?.value || "ALL";
 
   // 데이터 필터링 및 시간순 정렬
   const filtered = processed
-    .filter(t => (!start || t.date >= start) && (!end || t.date <= end) && (assetFilter === "ALL" || t.asset === assetFilter))
+    .filter(t => (!start || t.date >= start) && (!end || t.date <= end) && (assetFilter === "ALL" || t.asset === assetFilter) && (maturityFilter === "ALL" || t.maturity === maturityFilter))
     .map(t => ({
       ...t,
       inputOrder: inputOrderMap.get(t.id) || 0
@@ -2951,7 +2964,7 @@ function renderPerformanceReport() {
       <tr>
         <td>${t.inputOrder || '-'}</td>
         <td>${t.date}</td>
-        <td>${t.asset}</td>
+        <td><b>${t.asset}</b><br><small style="color:var(--muted)">${t.maturity || '-'}</small></td>
         <td>${sidePill(t.side)}</td>
         <td>${t.price.toLocaleString()}</td>
         <td>${t.qty}</td>
