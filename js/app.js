@@ -593,11 +593,11 @@ const tableSortState = {
 const tableSortLabels = {
   history: {
     inputOrder: '입력순', date: '일자', asset: '상품', side: '구분', price: '가격', qty: '수량',
-    status: '상태', stopLoss: '스탑', netPnlCur: '순손익(통화)', netPct: '손익률', memo: '메모'
+    status: '상태', stopLoss: '스탑', realizedPnlCur: '실현손익(통화)', feeCur: '수수료(통화)', unrealizedPnlCur: '미실현손익(통화)', positionPnlCur: '포지션누적(만기)', memo: '메모'
   },
   report: {
     inputOrder: '입력순', date: '날짜', asset: '상품', side: '구분', price: '가격', qty: '수량', status: '상태',
-    realizedPnlCur: '실현손익(통화)', feeCur: '수수료(통화)', netPnlCur: '순손익(통화)', netPct: '손익률', memo: '메모'
+    realizedPnlCur: '실현손익(통화)', feeCur: '수수료(통화)', unrealizedPnlCur: '미실현손익(통화)', positionPnlCur: '포지션누적(만기)', memo: '메모'
   }
 };
 
@@ -1541,6 +1541,12 @@ function safeNum(x, d = 0) { const n = parseFloat(x); return isNaN(n) ? d : n; }
 function isLongSide(side) { return side === "Buy"; }
 function sideLabel(side) { return isLongSide(side) ? "Long" : "Short"; }
 function sidePill(side) { return `<span class="pill ${isLongSide(side) ? 'pill-long' : 'pill-short'}">${sideLabel(side)}</span>`; }
+function formatPnlCell(value, cur) {
+  if (!Number.isFinite(value) || value === 0) return '-';
+  return cur === 'USD'
+    ? "$" + value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : Math.round(value).toLocaleString();
+}
 function compareSortValues(a, b) {
   if (a == null && b == null) return 0;
   if (a == null) return 1;
@@ -2217,6 +2223,26 @@ function renderTables(res, margin) {
 
   const editingTrade = editingId ? trades.find(t => t.id === editingId) : null;
   const editingKey = editingTrade ? `${editingTrade.asset}_${editingTrade.maturity}` : null;
+  const positionPnlMap = new Map();
+
+  res.processed.forEach(t => {
+    const key = `${t.asset}_${t.maturity}`;
+    const entry = positionPnlMap.get(key) || { cur: t.cur || 'KRW', realized: 0, unrealized: 0, positionPnl: 0 };
+    entry.cur = t.cur || entry.cur;
+    entry.realized += safeNum(t.realizedPnlCur, 0);
+    positionPnlMap.set(key, entry);
+  });
+
+  res.openPos.forEach(p => {
+    const entry = positionPnlMap.get(p.key) || { cur: p.cur || 'KRW', realized: 0, unrealized: 0, positionPnl: 0 };
+    entry.cur = p.cur || entry.cur;
+    entry.unrealized = safeNum(p.uPnl, 0);
+    positionPnlMap.set(p.key, entry);
+  });
+
+  positionPnlMap.forEach(entry => {
+    entry.positionPnl = entry.realized + entry.unrealized;
+  });
 
   res.openPos.forEach(p => {
     const dte = Math.ceil((new Date(p.maturity) - new Date().setHours(0, 0, 0, 0)) / 86400000);
@@ -2265,6 +2291,7 @@ function renderTables(res, margin) {
     const residualQty = res.residualTradeQtyMap[t.id] || 0;
     const tradeStatus = t.isCloseTrade ? 'CLOSE' : 'OPEN';
     const contributesToOpen = residualQty > 0;
+    const pnlSummary = positionPnlMap.get(posKey) || { cur: t.cur || 'KRW', realized: 0, unrealized: 0, positionPnl: 0 };
     return {
       ...t,
       posKey,
@@ -2272,6 +2299,9 @@ function renderTables(res, margin) {
       residualQty,
       tradeStatus,
       contributesToOpen,
+      realizedPnlCur: t.realizedPnlCur,
+      unrealizedPnlCur: pnlSummary.unrealized,
+      positionPnlCur: pnlSummary.positionPnl,
       inputOrder: inputOrderMap.get(t.id) || 0,
       status: `${tradeStatus}_${isSquared ? 'SQUARED' : 'OPEN'}_${residualQty > 0 ? 'LIVE' : 'FLAT'}`
     };
@@ -2288,6 +2318,7 @@ function renderTables(res, margin) {
     `;
     const isEditingThis = (t.id === editingId);
     const isRelatedToFocus = (t.posKey === historyFocusKey);
+    const pnlSummary = positionPnlMap.get(t.posKey) || { cur: t.cur || 'KRW', realized: 0, unrealized: 0, positionPnl: 0 };
     const rowClass = [
       isEditingThis ? 'edit-active-row' : '',
       isRelatedToFocus ? 'history-focus-row' : '',
@@ -2304,13 +2335,10 @@ function renderTables(res, margin) {
         <td>${t.qty}</td>
         <td>${statusLabel}</td>
         <td>${t.stopLoss ?? '-'}</td>
-        <td class="${t.netPnlCur >= 0 ? 'up' : 'down'}">${t.netPnlCur !== 0
-        ? (t.cur === "USD"
-          ? "$" + t.netPnlCur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-          : Math.round(t.netPnlCur).toLocaleString())
-        : '-'
-      }</td>
-        <td class="${t.netPct >= 0 ? 'up' : 'down'}">${t.netPct !== 0 ? t.netPct.toFixed(2) + '%' : '-'}</td>
+        <td class="${t.realizedPnlCur >= 0 ? 'up' : 'down'}">${formatPnlCell(t.realizedPnlCur, t.cur)}</td>
+        <td style="color:var(--bad)">${t.feeCur !== 0 ? formatPnlCell(t.feeCur, t.cur) : '-'}</td>
+        <td class="${pnlSummary.unrealized >= 0 ? 'up' : 'down'}">${formatPnlCell(pnlSummary.unrealized, pnlSummary.cur)}</td>
+        <td class="${pnlSummary.positionPnl >= 0 ? 'up' : 'down'}">${formatPnlCell(pnlSummary.positionPnl, pnlSummary.cur)}</td>
         <td>
           <button onclick="focusHistoryByPosition('${t.posKey}')" class="btn-outline btn-xs">관련보기</button>
           <button onclick="editTrade(${t.id})" class="btn-edit">수정</button>
@@ -2932,9 +2960,30 @@ function renderPerformanceReport() {
   body.innerHTML = '';
   refreshSortHeaders();
 
+  const reportPnlMap = new Map();
+  filtered.forEach(t => {
+    const key = `${t.asset}_${t.maturity}`;
+    const entry = reportPnlMap.get(key) || { cur: t.cur || 'KRW', realized: 0, unrealized: 0, positionPnl: 0 };
+    entry.cur = t.cur || entry.cur;
+    entry.realized += safeNum(t.realizedPnlCur, 0);
+    reportPnlMap.set(key, entry);
+  });
+  res.openPos.forEach(p => {
+    const entry = reportPnlMap.get(p.key) || { cur: p.cur || 'KRW', realized: 0, unrealized: 0, positionPnl: 0 };
+    entry.cur = p.cur || entry.cur;
+    entry.unrealized = safeNum(p.uPnl, 0);
+    reportPnlMap.set(p.key, entry);
+  });
+  reportPnlMap.forEach(entry => {
+    entry.positionPnl = entry.realized + entry.unrealized;
+  });
+
   const reportRows = sortRows(filtered.map(t => ({
     ...t,
-    status: t.currentNetQty === 0 ? 'SQUARED' : (t.isCloseTrade ? 'CLOSE' : 'OPEN')
+    status: t.currentNetQty === 0 ? 'SQUARED' : (t.isCloseTrade ? 'CLOSE' : 'OPEN'),
+    realizedPnlCur: t.realizedPnlCur,
+    unrealizedPnlCur: reportPnlMap.get(`${t.asset}_${t.maturity}`)?.unrealized || 0,
+    positionPnlCur: reportPnlMap.get(`${t.asset}_${t.maturity}`)?.positionPnl || safeNum(t.realizedPnlCur, 0)
   })), 'report');
 
   reportRows.forEach(t => {
@@ -2969,10 +3018,10 @@ function renderPerformanceReport() {
         <td>${t.price.toLocaleString()}</td>
         <td>${t.qty}</td>
         <td><span class="pill">${statusLabel}</span></td>
-        <td>${t.cur === "USD" ? "$" + t.realizedPnlCur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(t.realizedPnlCur).toLocaleString()}</td>
-        <td style="color:var(--bad)">${t.cur === "USD" ? "$" + t.feeCur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(t.feeCur).toLocaleString()}</td>
-        <td><b>${t.cur === "USD" ? "$" + t.netPnlCur.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(t.netPnlCur).toLocaleString()}</b></td>
-        <td class="${t.netPct >= 0 ? 'up' : 'down'}">${t.netPct.toFixed(2)}%</td>
+        <td class="${t.realizedPnlCur >= 0 ? 'up' : 'down'}">${formatPnlCell(t.realizedPnlCur, t.cur)}</td>
+        <td style="color:var(--bad)">${t.feeCur !== 0 ? formatPnlCell(t.feeCur, t.cur) : '-'}</td>
+        <td class="${t.unrealizedPnlCur >= 0 ? 'up' : 'down'}">${formatPnlCell(t.unrealizedPnlCur, t.cur)}</td>
+        <td class="${t.positionPnlCur >= 0 ? 'up' : 'down'}">${formatPnlCell(t.positionPnlCur, t.cur)}</td>
         <td><button onclick="focusHistoryByPosition('${posKey}')" class="btn-outline btn-xs">관련보기</button></td>
         <td class="mono" style="font-size:10px; opacity:0.7;">${t.memo || '-'}</td>
       </tr>`;

@@ -2,6 +2,48 @@
 
 ## 2026-07-21
 
+### Trade History와 Performance Report에 수수료 컬럼 추가
+
+- `Trade History`와 `Performance Report` 상세 표에 `수수료(통화)` 컬럼을 다시 추가했다.
+- 수수료는 계산식을 바꾸지 않고 기존 체결별 `feeCur` 값을 그대로 표시한다.
+
+영향 범위
+- `index.html` Trade History / Performance Report 헤더
+- `js/app.js` 거래/리포트 행 렌더링
+
+검증
+- 코드 수정만 반영했고 브라우저 수동 검증은 아직 하지 않았다.
+
+## 2026-07-21
+
+### Performance Report 상세 손익 표시를 Trade History와 맞춤
+
+- Performance Report의 상세 표에도 `실현손익`, `미실현손익`, `포지션누적(만기)`을 표시하도록 맞췄다.
+- 요약 카드의 수수료/순손익 기준은 그대로 두고, 상세 표의 해석만 Trade History와 동일한 구조로 정리했다.
+
+영향 범위
+- `index.html` Performance Report 상세 표 헤더
+- `js/app.js` Performance Report 상세 표 렌더링
+
+검증
+- 코드 수정만 반영했고 브라우저 수동 검증은 아직 하지 않았다.
+
+## 2026-07-21
+
+### Trade History에 실현/미실현/포지션 누적손익 표시 추가
+
+- Trade History의 손익 컬럼을 `실현손익`, `미실현손익`, `포지션누적(만기)`으로 바꿨다.
+- 실현손익은 거래별 확정 손익을, 미실현손익은 현재 포지션 평가 손익을, 포지션 누적손익은 `상품/만기` 기준 합산 값을 보여주도록 했다.
+
+영향 범위
+- `index.html` Trade History 헤더
+- `js/app.js` Trade History 손익 집계 및 행 렌더링
+
+검증
+- 코드 수정만 반영했고 브라우저 수동 검증은 아직 하지 않았다.
+
+## 2026-07-21
+
 ### Performance Report 조회 옵션에 만기일자 필터 추가
 
 - Performance Report 조회 옵션에 `만기일자` 필터를 추가했다.
