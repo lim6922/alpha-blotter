@@ -3032,7 +3032,6 @@ function renderPerformanceReport() {
     rowPnlCur: calcTradeUnrealizedPnlCur(t, (reportPnlMap.get(`${t.asset}_${t.maturity}`)?.markPrice || resolveMarkPrice(t.asset, t.maturity, t.price))),
     residualPnlCur: reportPnlMap.get(`${t.asset}_${t.maturity}`)?.unrealized || 0,
     positionPnlCur: reportPnlMap.get(`${t.asset}_${t.maturity}`)?.positionPnl || safeNum(t.realizedPnlCur, 0),
-    unrealizedPnlCur: calcTradeUnrealizedPnlCur(t, (reportPnlMap.get(`${t.asset}_${t.maturity}`)?.markPrice || resolveMarkPrice(t.asset, t.maturity, t.price))),
     virtualPnlCur: calcTradeUnrealizedPnlCur(t, (reportPnlMap.get(`${t.asset}_${t.maturity}`)?.markPrice || resolveMarkPrice(t.asset, t.maturity, t.price)))
   })), 'report');
 
@@ -3061,6 +3060,7 @@ function renderPerformanceReport() {
     const statusLabel = t.status;
     const rowPnlCur = t.rowPnlCur ?? t.unrealizedPnlCur;
     const residualPnlCur = t.residualPnlCur ?? 0;
+    const showBreakdown = t.currentNetQty !== 0;
     body.innerHTML += `
       <tr>
         <td>${t.inputOrder || '-'}</td>
@@ -3072,7 +3072,7 @@ function renderPerformanceReport() {
         <td><span class="pill">${statusLabel}</span></td>
         <td class="${t.realizedPnlCur >= 0 ? 'up' : 'down'}">${formatPnlCell(t.realizedPnlCur, t.cur)}</td>
         <td style="color:var(--bad)">${t.feeCur !== 0 ? formatPnlCell(t.feeCur, t.cur) : '-'}</td>
-        <td>${formatPnlBreakdownCell(rowPnlCur, residualPnlCur, t.cur, t.currentNetQty > 0)}</td>
+        <td>${formatPnlBreakdownCell(rowPnlCur, residualPnlCur, t.cur, showBreakdown)}</td>
         <td style="color:var(--muted)">${formatPnlCell(t.virtualPnlCur, t.cur)}</td>
         <td class="${t.positionPnlCur >= 0 ? 'up' : 'down'}">${formatPnlCell(t.positionPnlCur, t.cur)}</td>
         <td><button onclick="focusHistoryByPosition('${posKey}')" class="btn-outline btn-xs">관련보기</button></td>
