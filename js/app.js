@@ -1581,9 +1581,11 @@ function formatPnlBreakdownCell(rowValue, residualValue, cur, showValues = true)
     </div>`;
   }
 
+  const rowDisplayValue = residualValue < 0 ? NaN : rowValue;
+
   return `
     <div style="display:flex; flex-direction:column; gap:2px; line-height:1.15;">
-      <div class="${pnlClass(rowValue)}">행 ${formatPnlCell(rowValue, cur)}</div>
+      <div class="${pnlClass(rowDisplayValue)}">행 ${formatPnlCell(rowDisplayValue, cur)}</div>
       <div class="${pnlClass(residualValue)}" style="opacity:0.9;">잔존 ${formatPnlCell(residualValue, cur)}</div>
     </div>`;
 }
