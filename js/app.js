@@ -1572,11 +1572,19 @@ function calcTradeUnrealizedPnlCur(trade, markPrice) {
   const pointMove = (currentPrice - entryPrice) * dir;
   return (pointMove / m.tick) * m.tickVal * qty;
 }
-function formatPnlBreakdownCell(rowValue, residualValue, cur) {
+function formatPnlBreakdownCell(rowValue, residualValue, cur, showValues = true) {
+  if (!showValues) {
+    return `
+    <div style="display:flex; flex-direction:column; gap:2px; line-height:1.15;">
+      <div class="muted">-</div>
+      <div class="muted" style="opacity:0.9;">-</div>
+    </div>`;
+  }
+
   return `
     <div style="display:flex; flex-direction:column; gap:2px; line-height:1.15;">
       <div class="${pnlClass(rowValue)}">행 ${formatPnlCell(rowValue, cur)}</div>
-      <div class="${pnlClass(residualValue)}" style="opacity:0.9;">잔 ${formatPnlCell(residualValue, cur)}</div>
+      <div class="${pnlClass(residualValue)}" style="opacity:0.9;">잔존 ${formatPnlCell(residualValue, cur)}</div>
     </div>`;
 }
 function compareSortValues(a, b) {
@@ -2375,7 +2383,7 @@ function renderTables(res, margin) {
         <td>${t.stopLoss ?? '-'}</td>
         <td class="${t.realizedPnlCur >= 0 ? 'up' : 'down'}">${formatPnlCell(t.realizedPnlCur, t.cur)}</td>
         <td style="color:var(--bad)">${t.feeCur !== 0 ? formatPnlCell(t.feeCur, t.cur) : '-'}</td>
-        <td>${formatPnlBreakdownCell(rowPnlCur, pnlSummary.unrealized, pnlSummary.cur)}</td>
+        <td>${formatPnlBreakdownCell(rowPnlCur, pnlSummary.unrealized, pnlSummary.cur, t.contributesToOpen)}</td>
         <td class="${pnlSummary.positionPnl >= 0 ? 'up' : 'down'}">${formatPnlCell(pnlSummary.positionPnl, pnlSummary.cur)}</td>
         <td>
           <button onclick="focusHistoryByPosition('${t.posKey}')" class="btn-outline btn-xs">관련보기</button>
@@ -3062,7 +3070,7 @@ function renderPerformanceReport() {
         <td><span class="pill">${statusLabel}</span></td>
         <td class="${t.realizedPnlCur >= 0 ? 'up' : 'down'}">${formatPnlCell(t.realizedPnlCur, t.cur)}</td>
         <td style="color:var(--bad)">${t.feeCur !== 0 ? formatPnlCell(t.feeCur, t.cur) : '-'}</td>
-        <td>${formatPnlBreakdownCell(rowPnlCur, residualPnlCur, t.cur)}</td>
+        <td>${formatPnlBreakdownCell(rowPnlCur, residualPnlCur, t.cur, t.currentNetQty > 0)}</td>
         <td class="${t.positionPnlCur >= 0 ? 'up' : 'down'}">${formatPnlCell(t.positionPnlCur, t.cur)}</td>
         <td><button onclick="focusHistoryByPosition('${posKey}')" class="btn-outline btn-xs">관련보기</button></td>
         <td class="mono" style="font-size:10px; opacity:0.7;">${t.memo || '-'}</td>
