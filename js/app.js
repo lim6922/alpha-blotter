@@ -3058,10 +3058,7 @@ function renderPerformanceReport() {
 
     // 3. 테이블 행 추가
     const hasResidual = t.currentNetQty > 0;
-    const statusLabel = `
-      <span class="pill">${t.status}</span>
-      ${hasResidual ? `<span class="pill pill-live">잔존 ${t.currentNetQty}</span>` : ''}
-    `;
+    const statusLabel = `<span class="pill">${t.status}</span>`;
     const rowPnlCur = t.rowPnlCur ?? t.unrealizedPnlCur;
     const residualPnlCur = t.residualPnlCur ?? 0;
     const showBreakdown = hasResidual;
