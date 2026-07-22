@@ -3057,10 +3057,14 @@ function renderPerformanceReport() {
     }
 
     // 3. 테이블 행 추가
-    const statusLabel = t.status;
+    const hasResidual = t.currentNetQty > 0;
+    const statusLabel = `
+      <span class="pill">${t.status}</span>
+      ${hasResidual ? `<span class="pill pill-live">잔존 ${t.currentNetQty}</span>` : ''}
+    `;
     const rowPnlCur = t.rowPnlCur ?? t.unrealizedPnlCur;
     const residualPnlCur = t.residualPnlCur ?? 0;
-    const showBreakdown = t.currentNetQty !== 0;
+    const showBreakdown = hasResidual;
     body.innerHTML += `
       <tr>
         <td>${t.inputOrder || '-'}</td>
@@ -3069,7 +3073,7 @@ function renderPerformanceReport() {
         <td>${sidePill(t.side)}</td>
         <td>${t.price.toLocaleString()}</td>
         <td>${t.qty}</td>
-        <td><span class="pill">${statusLabel}</span></td>
+        <td>${statusLabel}</td>
         <td class="${t.realizedPnlCur >= 0 ? 'up' : 'down'}">${formatPnlCell(t.realizedPnlCur, t.cur)}</td>
         <td style="color:var(--bad)">${t.feeCur !== 0 ? formatPnlCell(t.feeCur, t.cur) : '-'}</td>
         <td>${formatPnlBreakdownCell(rowPnlCur, residualPnlCur, t.cur, showBreakdown)}</td>
