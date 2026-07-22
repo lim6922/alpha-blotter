@@ -3029,9 +3029,10 @@ function renderPerformanceReport() {
     ...t,
     status: t.currentNetQty === 0 ? 'SQUARED' : (t.isCloseTrade ? 'CLOSE' : 'OPEN'),
     realizedPnlCur: t.realizedPnlCur,
-    unrealizedPnlCur: calcTradeUnrealizedPnlCur(t, (reportPnlMap.get(`${t.asset}_${t.maturity}`)?.markPrice || resolveMarkPrice(t.asset, t.maturity, t.price))),
+    rowPnlCur: calcTradeUnrealizedPnlCur(t, (reportPnlMap.get(`${t.asset}_${t.maturity}`)?.markPrice || resolveMarkPrice(t.asset, t.maturity, t.price))),
     residualPnlCur: reportPnlMap.get(`${t.asset}_${t.maturity}`)?.unrealized || 0,
     positionPnlCur: reportPnlMap.get(`${t.asset}_${t.maturity}`)?.positionPnl || safeNum(t.realizedPnlCur, 0),
+    unrealizedPnlCur: calcTradeUnrealizedPnlCur(t, (reportPnlMap.get(`${t.asset}_${t.maturity}`)?.markPrice || resolveMarkPrice(t.asset, t.maturity, t.price))),
     virtualPnlCur: calcTradeUnrealizedPnlCur(t, (reportPnlMap.get(`${t.asset}_${t.maturity}`)?.markPrice || resolveMarkPrice(t.asset, t.maturity, t.price)))
   })), 'report');
 
@@ -3058,7 +3059,7 @@ function renderPerformanceReport() {
 
     // 3. 테이블 행 추가
     const statusLabel = t.status;
-    const rowPnlCur = t.unrealizedPnlCur;
+    const rowPnlCur = t.rowPnlCur ?? t.unrealizedPnlCur;
     const residualPnlCur = t.residualPnlCur ?? 0;
     body.innerHTML += `
       <tr>

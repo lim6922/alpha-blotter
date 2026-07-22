@@ -301,4 +301,15 @@ Verification
 
 검증
 - `node --check js/app.js` 통과
+## 2026-07-22
 
+### 퍼포먼스 리포트 행손익 참조 오류 수정
+
+- `renderPerformanceReport()`의 `rowPnlCur` 참조 오류를 바로잡았다.
+- `virtualPnlCur`와 `unrealizedPnlCur`는 각각 같은 행손익 계산식을 직접 사용하도록 유지했다.
+
+영향 범위
+- `js/app.js` 퍼포먼스 리포트 행 계산
+
+검증
+- `node --check js/app.js` 통과
