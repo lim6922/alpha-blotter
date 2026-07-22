@@ -288,3 +288,17 @@ Verification
 
 검증
 - `node --check js/app.js` 통과
+
+## 2026-07-22
+
+### 퍼포먼스 리포트 렌더링 오류 수정
+
+- `renderPerformanceReport()`에서 `virtualPnlCur`가 `rowPnlCur`를 참조하던 오류를 바로잡았다.
+- 가상 행손익은 `calcTradeUnrealizedPnlCur()`를 직접 호출해 계산하도록 변경했다.
+
+영향 범위
+- `js/app.js` 퍼포먼스 리포트 행 계산
+
+검증
+- `node --check js/app.js` 통과
+
