@@ -1629,6 +1629,29 @@ function getTradeInputOrderMap(sourceTrades = trades) {
   return orderMap;
 }
 
+function buildSequentialPositionPnlMap(rows) {
+  const orderedRows = rows
+    .slice()
+    .sort((a, b) => {
+      const orderDiff = safeNum(a.inputOrder, 0) - safeNum(b.inputOrder, 0);
+      if (orderDiff !== 0) return orderDiff;
+      return compareSortValues(a.date, b.date) * -1;
+    });
+
+  const runningByPosition = new Map();
+  const pnlByTradeId = new Map();
+
+  orderedRows.forEach(t => {
+    const key = `${t.asset}_${t.maturity}`;
+    const prevRunning = runningByPosition.get(key) || 0;
+    const running = prevRunning + safeNum(t.realizedPnlCur, 0);
+    pnlByTradeId.set(t.id, running);
+    runningByPosition.set(key, t.currentNetQty === 0 ? 0 : running);
+  });
+
+  return pnlByTradeId;
+}
+
 function calcStopRiskKRW(t) {
   if (t.stopLoss == null || t.stopLoss === "" || isNaN(t.stopLoss)) return 0;
   const m = master[t.asset];
@@ -2286,6 +2309,12 @@ function renderTables(res, margin) {
   positionPnlMap.forEach(entry => {
     entry.positionPnl = entry.realized + entry.unrealized;
   });
+  const historyPositionPnlMap = buildSequentialPositionPnlMap(
+    res.processed.map(t => ({
+      ...t,
+      inputOrder: inputOrderMap.get(t.id) || 0
+    }))
+  );
 
   res.openPos.forEach(p => {
     const dte = Math.ceil((new Date(p.maturity) - new Date().setHours(0, 0, 0, 0)) / 86400000);
@@ -2347,7 +2376,7 @@ function renderTables(res, margin) {
       realizedPnlCur: t.realizedPnlCur,
       unrealizedPnlCur: rowPnlCur,
       residualPnlCur: pnlSummary.unrealized,
-      positionPnlCur: pnlSummary.positionPnl,
+      positionPnlCur: historyPositionPnlMap.get(t.id) ?? pnlSummary.positionPnl,
       inputOrder: inputOrderMap.get(t.id) || 0,
       status: `${tradeStatus}_${isSquared ? 'SQUARED' : 'OPEN'}_${residualQty > 0 ? 'LIVE' : 'FLAT'}`
     };
@@ -3027,20 +3056,14 @@ function renderPerformanceReport() {
     entry.positionPnl = entry.realized + entry.unrealized;
   });
 
-  const reportPositionRunningMap = new Map();
+  const reportPositionPnlMap = buildSequentialPositionPnlMap(filtered);
   const reportRows = sortRows(filtered.map(t => ({
     ...t,
     status: t.currentNetQty === 0 ? 'SQUARED' : (t.isCloseTrade ? 'CLOSE' : 'OPEN'),
     realizedPnlCur: t.realizedPnlCur,
     rowPnlCur: calcTradeUnrealizedPnlCur(t, (reportPnlMap.get(`${t.asset}_${t.maturity}`)?.markPrice || resolveMarkPrice(t.asset, t.maturity, t.price))),
     residualPnlCur: reportPnlMap.get(`${t.asset}_${t.maturity}`)?.unrealized || 0,
-    positionPnlCur: (() => {
-      const key = `${t.asset}_${t.maturity}`;
-      const prevRunning = reportPositionRunningMap.get(key) || 0;
-      const running = prevRunning + safeNum(t.realizedPnlCur, 0);
-      reportPositionRunningMap.set(key, t.currentNetQty === 0 ? 0 : running);
-      return running;
-    })(),
+    positionPnlCur: reportPositionPnlMap.get(t.id) ?? safeNum(t.realizedPnlCur, 0),
     virtualPnlCur: calcTradeUnrealizedPnlCur(t, (reportPnlMap.get(`${t.asset}_${t.maturity}`)?.markPrice || resolveMarkPrice(t.asset, t.maturity, t.price)))
   })), 'report');
 

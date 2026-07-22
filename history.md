@@ -26,6 +26,18 @@
 검증
 - 미실행
 
+### 대시보드 Trade History에도 포지션누적 순차 누적 반영
+
+- Dashboard의 Trade History `포지션누적(만기)`도 Performance Report와 같은 입력 순번 누적 규칙을 쓰도록 맞췄다.
+- 화면 정렬과 별개로, 거래 자체의 입력 순서를 기준으로 누적값이 계산되도록 공통 헬퍼를 추가했다.
+
+영향 범위
+- `js/app.js` Trade History / Performance Report `positionPnlCur` 계산
+- `AGENTS.md` 계산 규칙
+
+검증
+- 미실행
+
 ## 2026-04-05
 
 ### 문서 운영 규칙 추가
