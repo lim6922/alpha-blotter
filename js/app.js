@@ -2415,7 +2415,7 @@ function renderTables(res, margin) {
         <td class="${t.realizedPnlCur >= 0 ? 'up' : 'down'}">${formatPnlCell(t.realizedPnlCur, t.cur)}</td>
         <td style="color:var(--bad)">${t.feeCur !== 0 ? formatPnlCell(t.feeCur, t.cur) : '-'}</td>
         <td>${formatPnlBreakdownCell(rowPnlCur, pnlSummary.unrealized, pnlSummary.cur, t.contributesToOpen)}</td>
-        <td class="${pnlSummary.positionPnl >= 0 ? 'up' : 'down'}">${formatPnlCell(pnlSummary.positionPnl, pnlSummary.cur)}</td>
+        <td class="${t.positionPnlCur >= 0 ? 'up' : 'down'}">${formatPnlCell(t.positionPnlCur, t.cur)}</td>
         <td>
           <button onclick="focusHistoryByPosition('${t.posKey}')" class="btn-outline btn-xs">관련보기</button>
           <button onclick="editTrade(${t.id})" class="btn-edit">수정</button>
