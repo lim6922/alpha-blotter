@@ -1581,7 +1581,7 @@ function formatPnlBreakdownCell(rowValue, residualValue, cur, showValues = true)
     </div>`;
   }
 
-  const rowDisplayValue = residualValue < 0 ? NaN : rowValue;
+  const rowDisplayValue = rowValue;
 
   return `
     <div style="display:flex; flex-direction:column; gap:2px; line-height:1.15;">
@@ -3033,7 +3033,7 @@ function renderPerformanceReport() {
     realizedPnlCur: t.realizedPnlCur,
     rowPnlCur: calcTradeUnrealizedPnlCur(t, (reportPnlMap.get(`${t.asset}_${t.maturity}`)?.markPrice || resolveMarkPrice(t.asset, t.maturity, t.price))),
     residualPnlCur: reportPnlMap.get(`${t.asset}_${t.maturity}`)?.unrealized || 0,
-    positionPnlCur: reportPnlMap.get(`${t.asset}_${t.maturity}`)?.positionPnl || safeNum(t.realizedPnlCur, 0),
+    positionPnlCur: reportPnlMap.get(`${t.asset}_${t.maturity}`)?.positionPnl ?? safeNum(t.realizedPnlCur, 0),
     virtualPnlCur: calcTradeUnrealizedPnlCur(t, (reportPnlMap.get(`${t.asset}_${t.maturity}`)?.markPrice || resolveMarkPrice(t.asset, t.maturity, t.price)))
   })), 'report');
 

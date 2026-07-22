@@ -305,6 +305,20 @@ Verification
 
 ## 2026-07-22
 
+### 대시보드 행손익 표시 및 포지션누적 기준 정리
+
+- 대시보드와 리포트에서 잔존이 있는 경우 `미실현손익(행손익/잔존손익)`의 행손익을 다시 표시하도록 정리했다.
+- `포지션누적(만기)`는 누적 실현손익을 기준으로 계산하고, `0` 값도 누락 없이 표시하도록 맞췄다.
+- 대시보드와 리포트가 같은 계산 기준을 쓰도록 `positionPnlCur` fallback을 정리했다.
+
+영향 범위
+- `js/app.js` 미실현손익 breakdown 및 report position PnL 계산
+
+검증
+- `node --check js/app.js` 통과
+
+## 2026-07-22
+
 ### 퍼포먼스 리포트 렌더링 오류 수정
 
 - `renderPerformanceReport()`에서 `virtualPnlCur`가 `rowPnlCur`를 참조하던 오류를 바로잡았다.
