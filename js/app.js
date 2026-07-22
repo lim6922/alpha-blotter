@@ -587,7 +587,7 @@ let editingId = null;
 let editingAsset = null;
 let historyFocusKey = null;
 const tableSortState = {
-  history: { key: 'inputOrder', dir: 'desc' },
+  history: { key: 'inputOrder', dir: 'asc' },
   report: { key: 'inputOrder', dir: 'asc' }
 };
 const tableSortLabels = {
