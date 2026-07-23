@@ -13,6 +13,28 @@
 검증
 - 코드 diff 확인
 
+### Period Trade History에 전체 누적 손익 칼럼 추가
+- `가상 미실현 손익(행손익)` 오른쪽에 `전체 누적 손익(KRW)` 칼럼을 추가했다.
+- 누적 값은 기간 내 거래를 입력 순서대로 따라가며 `netPnlKRW` 기준으로 계산한다.
+
+영향 범위
+- `index.html` Period Trade History 헤더
+- `js/app.js` Period Trade History 행 렌더링 및 누적 맵 계산
+
+검증
+- `node --check js/app.js` 통과
+
+### summary-grid 전체 실적 카드 1줄 추가
+- 기간 실적 카드 위에 `전체 실현손익`, `전체 수수료`, `전체 순손익`, `전체 승률`, `전체 PF` 카드 5개를 한 줄로 추가했다.
+- 전체 카드는 필터와 분리된 전체 거래 집계를 사용하고, 기간 카드는 기존 동작을 유지한다.
+
+영향 범위
+- `index.html` Performance Report summary-grid
+- `js/app.js` Performance Report 전체/기간 요약 계산 및 카드 렌더링
+
+검증
+- `node --check js/app.js` 통과
+
 ## 2026-07-22
 
 ### 퍼포먼스 리포트 가상 미실현 손익과 포지션누적 순서 변경

@@ -597,7 +597,7 @@ const tableSortLabels = {
   },
   report: {
     inputOrder: '입력순', date: '날짜', asset: '상품', side: '구분', price: '가격', qty: '수량', status: '상태',
-    realizedPnlCur: '실현손익(통화)', feeCur: '수수료(통화)', virtualPnlCur: '가상 미실현 손익(행손익)', positionPnlCur: '포지션누적(만기)', memo: '메모'
+    realizedPnlCur: '실현손익(통화)', feeCur: '수수료(통화)', virtualPnlCur: '가상 미실현 손익(행손익)', positionPnlCur: '포지션누적(만기)', totalPnlKrw: '전체 누적 손익(KRW)', memo: '메모'
   }
 };
 
@@ -2041,6 +2041,15 @@ function renderAll() {
   const tradeTotal = res.tradeTotal;
   const tradeWinRate = tradeTotal > 0 ? ((res.tradeWin / tradeTotal) * 100).toFixed(1) : "0.0";
   const tradePF = res.tradeLossSum > 0 ? (res.tradeWinSum / res.tradeLossSum).toFixed(2) : (res.tradeWinSum > 0 ? "∞" : "0.00");
+  const overallRealizedKRWTotal = res.rKRW_Dom + (res.rUSD_Ovs * globalFX);
+  const overallFeeKRWTotal = res.feeKRW_Dom + (res.feeUSD_Ovs * globalFX);
+  const overallNetKRWTotal = overallRealizedKRWTotal - overallFeeKRWTotal;
+  const overallTradeTotal = res.tradeTotal;
+  const overallTradeWinRate = overallTradeTotal > 0 ? ((res.tradeWin / overallTradeTotal) * 100).toFixed(1) : "0.0";
+  const overallTradePF = res.tradeLossSum > 0 ? (res.tradeWinSum / res.tradeLossSum).toFixed(2) : (res.tradeWinSum > 0 ? "∞" : "0.00");
+  const overallPosTotal = res.posTotal;
+  const overallPosWinRate = overallPosTotal > 0 ? ((res.posWin / overallPosTotal) * 100).toFixed(1) : "0.0";
+  const overallPosPF = res.posLossSum > 0 ? (res.posWinSum / res.posLossSum).toFixed(2) : (res.posWinSum > 0 ? "∞" : "0.00");
 
   // ---------------------------------------------------------
   // 2. 우측 사이드바: 계좌 자산 및 리스크 지표 업데이트
@@ -2082,6 +2091,34 @@ function renderAll() {
   const realizedBreakdownEl = document.getElementById("total-realized-breakdown");
   if (realizedBreakdownEl) {
     realizedBreakdownEl.innerText = "₩" + Math.round(netRealizedKRWDom).toLocaleString() + " / $" + netRealizedUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  const overallRealizedEl = document.getElementById("overall-realized");
+  if (overallRealizedEl) overallRealizedEl.innerText = Math.round(overallRealizedKRWTotal).toLocaleString();
+  const overallFeeEl = document.getElementById("overall-fee");
+  if (overallFeeEl) overallFeeEl.innerText = "-" + Math.round(overallFeeKRWTotal).toLocaleString();
+  const overallNetEl = document.getElementById("overall-net");
+  if (overallNetEl) overallNetEl.innerText = Math.round(overallNetKRWTotal).toLocaleString();
+  const overallRealizedBreakdownEl = document.getElementById("overall-realized-breakdown");
+  if (overallRealizedBreakdownEl) {
+    overallRealizedBreakdownEl.innerText = "₩" + Math.round(res.rKRW_Dom).toLocaleString() + " / $" + res.rUSD_Ovs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  const overallFeeBreakdownEl = document.getElementById("overall-fee-breakdown");
+  if (overallFeeBreakdownEl) {
+    overallFeeBreakdownEl.innerText = "₩" + Math.round(res.feeKRW_Dom).toLocaleString() + " / $" + res.feeUSD_Ovs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  const overallNetBreakdownEl = document.getElementById("overall-net-breakdown");
+  if (overallNetBreakdownEl) {
+    overallNetBreakdownEl.innerText = "₩" + Math.round(res.rKRW_Dom - res.feeKRW_Dom).toLocaleString() + " / $" + (res.rUSD_Ovs - res.feeUSD_Ovs).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  const overallWinrateEl = document.getElementById("overall-winrate");
+  if (overallWinrateEl) {
+    overallWinrateEl.innerHTML =
+      `<span style="color:var(--text)">${overallTradeWinRate}%</span> <span style="color:var(--muted); font-size:10px;">/</span> <span style="color:var(--accent)">${overallPosWinRate}%</span>`;
+  }
+  const overallPfEl = document.getElementById("overall-pf");
+  if (overallPfEl) {
+    overallPfEl.innerHTML =
+      `<span style="color:var(--text)">${overallTradePF}</span> <span style="color:var(--muted); font-size:10px;">/</span> <span style="color:var(--accent)">${overallPosPF}</span>`;
   }
 
   // ---------------------------------------------------------
@@ -3057,6 +3094,12 @@ function renderPerformanceReport() {
   });
 
   const reportPositionPnlMap = buildSequentialPositionPnlMap(filtered);
+  let reportCumulativePnlKRW = 0;
+  const reportTotalPnlMap = new Map();
+  filtered.forEach(t => {
+    reportCumulativePnlKRW += safeNum(t.netPnlKRW, 0);
+    reportTotalPnlMap.set(t.id, reportCumulativePnlKRW);
+  });
   const reportRows = sortRows(filtered.map(t => ({
     ...t,
     status: t.currentNetQty === 0 ? 'SQUARED' : (t.isCloseTrade ? 'CLOSE' : 'OPEN'),
@@ -3064,7 +3107,8 @@ function renderPerformanceReport() {
     rowPnlCur: calcTradeUnrealizedPnlCur(t, (reportPnlMap.get(`${t.asset}_${t.maturity}`)?.markPrice || resolveMarkPrice(t.asset, t.maturity, t.price))),
     residualPnlCur: reportPnlMap.get(`${t.asset}_${t.maturity}`)?.unrealized || 0,
     positionPnlCur: reportPositionPnlMap.get(t.id) ?? safeNum(t.realizedPnlCur, 0),
-    virtualPnlCur: calcTradeUnrealizedPnlCur(t, (reportPnlMap.get(`${t.asset}_${t.maturity}`)?.markPrice || resolveMarkPrice(t.asset, t.maturity, t.price)))
+    virtualPnlCur: calcTradeUnrealizedPnlCur(t, (reportPnlMap.get(`${t.asset}_${t.maturity}`)?.markPrice || resolveMarkPrice(t.asset, t.maturity, t.price))),
+    totalPnlKrw: reportTotalPnlMap.get(t.id) ?? 0
   })), 'report');
 
   reportRows.forEach(t => {
@@ -3103,6 +3147,7 @@ function renderPerformanceReport() {
         <td style="color:var(--bad)">${t.feeCur !== 0 ? formatPnlCell(t.feeCur, t.cur) : '-'}</td>
         <td class="${t.positionPnlCur >= 0 ? 'up' : 'down'}">${formatPnlCell(t.positionPnlCur, t.cur)}</td>
         <td style="color:var(--muted)">${formatPnlCell(t.virtualPnlCur, t.cur)}</td>
+        <td class="${t.totalPnlKrw >= 0 ? 'up' : 'down'}">${formatPnlCell(t.totalPnlKrw, 'KRW')}</td>
         <td><button onclick="focusHistoryByPosition('${posKey}')" class="btn-outline btn-xs">관련보기</button></td>
         <td class="mono" style="font-size:10px; opacity:0.7;">${t.memo || '-'}</td>
       </tr>`;

@@ -342,6 +342,15 @@
 
 
 <div class="summary-grid">
+  <!-- 전체 실적 -->
+  <div class="stat-card">    <div class="stat-label">전체 실현손익 (Gross, KRW 합산)</div>    <div id="overall-realized" class="stat-val mono">0</div>    <div style="font-size:10px; color:var(--muted)">KRW / USD: <b id="overall-realized-breakdown">₩0 / $0.00</b></div>  </div>
+  <div class="stat-card">    <div class="stat-label">전체 수수료 (Total Fee, KRW 합산)</div>    <div id="overall-fee" class="stat-val mono" style="color:var(--bad)">0</div>    <div style="font-size:10px; color:var(--muted)">KRW / USD: <b id="overall-fee-breakdown">₩0 / $0.00</b></div>  </div>
+  <div class="stat-card">    <div class="stat-label">전체 순손익 (Net PnL, KRW 합산)</div>    <div id="overall-net" class="stat-val mono" style="color:var(--accent)">0</div>    <div style="font-size:10px; color:var(--muted)">KRW / USD: <b id="overall-net-breakdown">₩0 / $0.00</b></div>  </div>
+  <div class="stat-card">    <div class="stat-label">전체 승률 (체결 / 포지션)</div>    <div id="overall-winrate" class="stat-val mono" style="font-size:13px;">-</div>  </div>
+  <div class="stat-card">    <div class="stat-label">전체 PF (체결 / 포지션)</div>    <div id="overall-pf" class="stat-val mono" style="font-size:13px;">-</div>  </div>
+</div>
+
+<div class="summary-grid">
   <!-- 1. 기간 실현손익 (수수료 차감 전) -->
   <div class="stat-card">    <div class="stat-label">기간 실현손익 (Gross, KRW 합산)</div>    <div id="rep-realized" class="stat-val mono">0</div>    <div style="font-size:10px; color:var(--muted)">KRW / USD: <b id="rep-realized-breakdown">₩0 / $0.00</b></div>  </div>
   <!-- 2. 기간 총 수수료 (빨간색 강조) -->
@@ -364,7 +373,7 @@
             <thead>
               <tr>
                 <th id="report-sort-inputOrder" class="sortable" onclick="toggleTableSort('report', 'inputOrder')">입력순</th><th id="report-sort-date" class="sortable" onclick="toggleTableSort('report', 'date')">날짜</th><th id="report-sort-asset" class="sortable" onclick="toggleTableSort('report', 'asset')">상품/만기</th><th id="report-sort-side" class="sortable" onclick="toggleTableSort('report', 'side')">구분</th><th id="report-sort-price" class="sortable" onclick="toggleTableSort('report', 'price')">가격</th><th id="report-sort-qty" class="sortable" onclick="toggleTableSort('report', 'qty')">수량</th><th id="report-sort-status" class="sortable" onclick="toggleTableSort('report', 'status')">상태</th>
-                <th id="report-sort-realizedPnlCur" class="sortable" onclick="toggleTableSort('report', 'realizedPnlCur')">실현손익(통화)</th><th id="report-sort-feeCur" class="sortable" onclick="toggleTableSort('report', 'feeCur')">수수료(통화)</th><th id="report-sort-positionPnlCur" class="sortable" onclick="toggleTableSort('report', 'positionPnlCur')">포지션누적(만기)</th><th id="report-sort-virtualPnlCur" class="sortable" onclick="toggleTableSort('report', 'virtualPnlCur')">가상 미실현 손익(행손익)</th><th>액션</th><th id="report-sort-memo" class="sortable" onclick="toggleTableSort('report', 'memo')">메모</th>
+                <th id="report-sort-realizedPnlCur" class="sortable" onclick="toggleTableSort('report', 'realizedPnlCur')">실현손익(통화)</th><th id="report-sort-feeCur" class="sortable" onclick="toggleTableSort('report', 'feeCur')">수수료(통화)</th><th id="report-sort-positionPnlCur" class="sortable" onclick="toggleTableSort('report', 'positionPnlCur')">포지션누적(만기)</th><th id="report-sort-virtualPnlCur" class="sortable" onclick="toggleTableSort('report', 'virtualPnlCur')">가상 미실현 손익(행손익)</th><th id="report-sort-totalPnlKrw" class="sortable" onclick="toggleTableSort('report', 'totalPnlKrw')">전체 누적 손익(KRW)</th><th>액션</th><th id="report-sort-memo" class="sortable" onclick="toggleTableSort('report', 'memo')">메모</th>
               </tr>
             </thead>
             <tbody></tbody>
