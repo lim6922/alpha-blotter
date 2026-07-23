@@ -1427,7 +1427,7 @@ async function refreshCloudSync() {
   const user = await getCurrentUserOrAlert();
   if (!user) return;
 
-  await importFromCloudInternal({ user, skipConfirm: true, silent: false, source: 'manual-refresh' });
+  await importFromCloudInternal({ user, skipConfirm: false, silent: false, source: 'manual-refresh' });
 }
 
 /**
