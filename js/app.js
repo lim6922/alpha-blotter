@@ -597,7 +597,7 @@ const tableSortLabels = {
   },
   report: {
     inputOrder: '입력순', date: '날짜', asset: '상품', side: '구분', price: '가격', qty: '수량', status: '상태',
-    realizedPnlCur: '실현손익(통화)', feeCur: '수수료(통화)', virtualPnlCur: '가상 미실현 손익(행손익)', positionPnlCur: '포지션누적(만기)', totalPnlKrw: '전체 누적 손익(KRW)', memo: '메모'
+    realizedPnlCur: '실현손익(통화)', feeCur: '수수료(통화)', virtualPnlCur: '가상 미실현 손익(행손익)', positionPnlCur: '포지션누적(만기)', totalPnlKrw: '기간 누적 손익(KRW)', overallTotalPnlKrw: '전체 누적 손익(KRW)', memo: '메모'
   }
 };
 
@@ -3094,6 +3094,12 @@ function renderPerformanceReport() {
   });
 
   const reportPositionPnlMap = buildSequentialPositionPnlMap(filtered);
+  const reportOverallPnlMap = new Map();
+  let reportOverallCumulativePnlKRW = 0;
+  processed.forEach(t => {
+    reportOverallCumulativePnlKRW += safeNum(t.netPnlKRW, 0);
+    reportOverallPnlMap.set(t.id, reportOverallCumulativePnlKRW);
+  });
   let reportCumulativePnlKRW = 0;
   const reportTotalPnlMap = new Map();
   filtered.forEach(t => {
@@ -3108,7 +3114,8 @@ function renderPerformanceReport() {
     residualPnlCur: reportPnlMap.get(`${t.asset}_${t.maturity}`)?.unrealized || 0,
     positionPnlCur: reportPositionPnlMap.get(t.id) ?? safeNum(t.realizedPnlCur, 0),
     virtualPnlCur: calcTradeUnrealizedPnlCur(t, (reportPnlMap.get(`${t.asset}_${t.maturity}`)?.markPrice || resolveMarkPrice(t.asset, t.maturity, t.price))),
-    totalPnlKrw: reportTotalPnlMap.get(t.id) ?? 0
+    totalPnlKrw: reportTotalPnlMap.get(t.id) ?? 0,
+    overallTotalPnlKrw: reportOverallPnlMap.get(t.id) ?? 0
   })), 'report');
 
   reportRows.forEach(t => {
@@ -3148,6 +3155,7 @@ function renderPerformanceReport() {
         <td class="${t.positionPnlCur >= 0 ? 'up' : 'down'}">${formatPnlCell(t.positionPnlCur, t.cur)}</td>
         <td style="color:var(--muted)">${formatPnlCell(t.virtualPnlCur, t.cur)}</td>
         <td class="${t.totalPnlKrw >= 0 ? 'up' : 'down'}">${formatPnlCell(t.totalPnlKrw, 'KRW')}</td>
+        <td class="${t.overallTotalPnlKrw >= 0 ? 'up' : 'down'}">${formatPnlCell(t.overallTotalPnlKrw, 'KRW')}</td>
         <td><button onclick="focusHistoryByPosition('${posKey}')" class="btn-outline btn-xs">관련보기</button></td>
         <td class="mono" style="font-size:10px; opacity:0.7;">${t.memo || '-'}</td>
       </tr>`;

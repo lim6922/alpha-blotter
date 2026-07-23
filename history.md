@@ -35,6 +35,28 @@
 검증
 - `node --check js/app.js` 통과
 
+### Period Trade History 누적 손익 헤더명 조정
+- Period Trade History의 `전체 누적 손익(KRW)` 표시명을 `기간 누적 손익(KRW)`로 바꿨다.
+- 계산 기준은 그대로 두고, 현재 기간 누적이라는 의미가 더 명확하게 드러나도록 정리했다.
+
+영향 범위
+- `index.html` Period Trade History 헤더
+- `js/app.js` Period Trade History 정렬 라벨
+
+검증
+- UI 텍스트 변경만 반영
+
+### Period Trade History 전체 누적 손익 컬럼 추가
+- `기간 누적 손익(KRW)` 오른쪽에 `전체 누적 손익(KRW)` 컬럼을 추가했다.
+- 전체 누적 값은 필터 범위가 아니라 `#1`부터의 전체 거래 순서 기준으로 누적한다.
+
+영향 범위
+- `index.html` Period Trade History 헤더
+- `js/app.js` Period Trade History 전체 누적 맵 및 행 렌더링
+
+검증
+- `node --check js/app.js` 예정
+
 ## 2026-07-22
 
 ### 퍼포먼스 리포트 가상 미실현 손익과 포지션누적 순서 변경
