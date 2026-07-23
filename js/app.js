@@ -24,7 +24,7 @@ let authAutoActionsBound = false;
 let integratedChart = null;
 
 const AUTO_BACKUP_DEBOUNCE_MS = 15000;
-const AUTO_BACKUP_LIMIT = 3;
+const AUTO_BACKUP_LIMIT = 20;
 const BACKUP_STORAGE_PREFIX = 'blotter_backups_v1_';
 
 let activeAuthUser = null;
@@ -70,9 +70,11 @@ function getBackupStateSignature() {
     local: Number(blotterMeta.lastLocalInputAt) || null,
     imported: Number(blotterMeta.lastImportedInputAt) || null,
     exported: Number(blotterMeta.lastExportedInputAt) || null,
+    fx: Number(globalFX) || null,
     trades: trades.length,
     atm: atmRecords.length,
-    assets: Object.keys(master || {}).length
+    assets: Object.keys(master || {}).length,
+    mtm: mtmPrices || {}
   });
 }
 
@@ -98,6 +100,8 @@ function buildBackupSnapshot(reason, user) {
       atmRecords: cloneSerializable(atmRecords),
       master: cloneSerializable(master),
       capitals: cloneSerializable(capitals),
+      mtmPrices: cloneSerializable(mtmPrices),
+      globalFX: Number(globalFX) || 0,
       blotterMeta: cloneSerializable(blotterMeta)
     }
   };
@@ -225,12 +229,16 @@ function applyBackupSnapshot(snapshot) {
   atmRecords = cloneSerializable(snapshot.snapshot.atmRecords || []);
   master = cloneSerializable(snapshot.snapshot.master || {});
   capitals = cloneSerializable(snapshot.snapshot.capitals || { dom: 0, ovs: 0 });
+  mtmPrices = cloneSerializable(snapshot.snapshot.mtmPrices || {});
+  globalFX = Number(snapshot.snapshot.globalFX) || globalFX;
   blotterMeta = cloneSerializable(snapshot.snapshot.blotterMeta || blotterMeta);
 
   localStorage.setItem('blotter_trades_v96', JSON.stringify(trades));
   localStorage.setItem('blotter_atm_v96', JSON.stringify(atmRecords));
   localStorage.setItem('blotter_master_v96', JSON.stringify(master));
   localStorage.setItem('blotter_capitals_v96', JSON.stringify(capitals));
+  localStorage.setItem('blotter_mtm_v96', JSON.stringify(mtmPrices));
+  localStorage.setItem('blotter_fx_v96', String(globalFX));
   localStorage.setItem('blotter_meta_v96', JSON.stringify(blotterMeta));
 
   loadCapitals();
@@ -761,6 +769,14 @@ function toISOStringSafeFromMillis(ms) {
   return d.toISOString();
 }
 
+function formatSyncBasisTime(ms) {
+  const n = Number(ms);
+  if (!Number.isFinite(n) || n <= 0) return '-';
+  const d = new Date(n);
+  if (isNaN(d.getTime())) return '-';
+  return d.toLocaleString('ko-KR', { hour12: false });
+}
+
 
 
 
@@ -1084,6 +1100,7 @@ async function exportToCloudInternal({ user = null, skipConfirm = false, silent 
 - 매매: ${trades.length}건
 - 입출금: ${atmRecords.length}건
 - 상품설정: ${Object.keys(master).length}건
+- 기준 시각: ${formatSyncBasisTime(blotterMeta.lastLocalInputAt)}
 
 기존 원격 데이터는 덮어써질 수 있습니다.
 계속하시겠습니까?`;
@@ -1343,6 +1360,7 @@ async function importFromCloudInternal({ user = null, skipConfirm = false, silen
 - 매매: ${remoteTrades.length}건
 - 입출금: ${remoteATM.length}건
 - 상품설정: ${Object.keys(remoteMaster).length}건
+- 기준 시각: ${formatSyncBasisTime(metaRow?.last_local_input_at)}
 
 기존 데이터를 덮어쓰시겠습니까?`;
 
@@ -1403,6 +1421,13 @@ async function importFromCloudInternal({ user = null, skipConfirm = false, silen
 
 async function importFromCloud() {
   await importFromCloudInternal();
+}
+
+async function refreshCloudSync() {
+  const user = await getCurrentUserOrAlert();
+  if (!user) return;
+
+  await importFromCloudInternal({ user, skipConfirm: true, silent: false, source: 'manual-refresh' });
 }
 
 /**
@@ -2891,6 +2916,7 @@ function updateMTM(k, v) {
   if (isNaN(n)) return;
   mtmPrices[k] = n;
   localStorage.setItem('blotter_mtm_v96', JSON.stringify(mtmPrices));
+  markLocalDirty('mtm-update');
   renderAll();
 }
 
