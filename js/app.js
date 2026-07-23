@@ -587,8 +587,8 @@ let editingId = null;
 let editingAsset = null;
 let historyFocusKey = null;
 const tableSortState = {
-  history: { key: 'inputOrder', dir: 'asc' },
-  report: { key: 'inputOrder', dir: 'asc' }
+  history: { key: 'inputOrder', dir: 'desc' },
+  report: { key: 'inputOrder', dir: 'desc' }
 };
 const tableSortLabels = {
   history: {
@@ -1646,7 +1646,7 @@ function buildSequentialPositionPnlMap(rows) {
     const prevRunning = runningByPosition.get(key) || 0;
     const running = prevRunning + safeNum(t.realizedPnlCur, 0);
     pnlByTradeId.set(t.id, running);
-    runningByPosition.set(key, t.currentNetQty === 0 ? 0 : running);
+    runningByPosition.set(key, running);
   });
 
   return pnlByTradeId;
