@@ -4,7 +4,7 @@
 
 ### Trade History live-close action button
 - Added a `청산` button to Trade History rows that still have residual quantity.
-- The button reuses `startCloseTradeFromPosition()` with the row's position key, so a live trade can be closed directly from history.
+- The button reuses `startCloseTradeFromPosition()` and passes the row's residual quantity, so a live trade can be closed directly from history with the row-level size.
 
 Impact scope
 - `js/app.js` Trade History row action rendering

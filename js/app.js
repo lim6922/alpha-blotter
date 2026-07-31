@@ -2300,7 +2300,7 @@ function clearHistoryFocus() {
   renderAll();
 }
 
-function startCloseTradeFromPosition(positionKey) {
+function startCloseTradeFromPosition(positionKey, closeQty = null) {
   const res = calculateEngine();
   const position = res.openPos.find(p => p.key === positionKey);
   if (!position) {
@@ -2323,7 +2323,7 @@ function startCloseTradeFromPosition(positionKey) {
   document.getElementById('side').value = closeSide;
   document.getElementById('asset').value = position.asset;
   document.getElementById('maturityDate').value = position.maturity || today;
-  document.getElementById('qty').value = Math.abs(position.qty);
+  document.getElementById('qty').value = Math.abs(Number(closeQty) || position.qty);
   document.getElementById('price').value = defaultPrice;
   document.getElementById('stopLoss').value = '';
   document.getElementById('fxRate').value = assetMeta.cur === 'KRW' ? 1 : Number(globalFX).toFixed(2);
@@ -2449,7 +2449,7 @@ function renderTables(res, margin) {
       ? `<span class="pill pill-live">잔존 ${t.residualQty}</span>`
       : ((t.isCloseTrade && !t.isSquared) ? `<span class="pill" style="opacity:.7">포지션 진행중</span>` : '');
     const closeActionButton = t.contributesToOpen
-      ? `<button onclick="startCloseTradeFromPosition('${t.posKey}')" class="btn-close btn-xs">청산</button>`
+      ? `<button onclick="startCloseTradeFromPosition('${t.posKey}', ${t.residualQty})" class="btn-close btn-xs">청산</button>`
       : '';
     const statusLabel = `
       <span class="pill">${t.tradeStatus}</span>
