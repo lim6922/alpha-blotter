@@ -1,5 +1,17 @@
 # History
 
+## 2026-07-31
+
+### Trade History live-close action button
+- Added a `청산` button to Trade History rows that still have residual quantity.
+- The button reuses `startCloseTradeFromPosition()` with the row's position key, so a live trade can be closed directly from history.
+
+Impact scope
+- `js/app.js` Trade History row action rendering
+
+Verification
+- Not run yet; UI-only change pending manual browser check.
+
 ## 2026-07-23
 
 ### 헤더에 클라우드 새로고침 버튼 추가

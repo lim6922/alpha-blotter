@@ -2448,6 +2448,9 @@ function renderTables(res, margin) {
     const qtyHint = t.contributesToOpen
       ? `<span class="pill pill-live">잔존 ${t.residualQty}</span>`
       : ((t.isCloseTrade && !t.isSquared) ? `<span class="pill" style="opacity:.7">포지션 진행중</span>` : '');
+    const closeActionButton = t.contributesToOpen
+      ? `<button onclick="startCloseTradeFromPosition('${t.posKey}')" class="btn-close btn-xs">청산</button>`
+      : '';
     const statusLabel = `
       <span class="pill">${t.tradeStatus}</span>
       ${t.isSquared ? `<span class="pill up">SQUARED</span>` : `<span class="pill muted">OPEN</span>`}
@@ -2482,6 +2485,7 @@ function renderTables(res, margin) {
           <button onclick="focusHistoryByPosition('${t.posKey}')" class="btn-outline btn-xs">관련보기</button>
           <button onclick="editTrade(${t.id})" class="btn-edit">수정</button>
           <button onclick="deleteTrade(${t.id})" class="btn-danger">삭제</button>
+          ${closeActionButton}
         </td>
         <td class="mono" title="${t.memo || '-'}">${t.memo ? t.memo : '-'}</td>
       </tr>`;
