@@ -1473,28 +1473,38 @@ function extractYahooRegularMarketPrice(data) {
 async function fetchYahooPrice(ySymbol) {
   const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ySymbol)}?interval=1m&range=1d&_seed=${Date.now()}`;
 
-  try {
-    const data = await fetchJsonWithTimeout(
-      `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`
-    );
-    const price = extractYahooRegularMarketPrice(data);
-    if (price !== null) return price;
-  } catch (error) {
-    console.warn(`Proxy 1 failed for ${ySymbol}:`, error?.name || error);
+  const sources = [
+    {
+      name: "cors.lol",
+      url: `https://api.cors.lol/?url=${encodeURIComponent(targetUrl)}`,
+      unwrap: (payload) => payload
+    },
+    {
+      name: "allorigins",
+      url: `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,
+      unwrap: (payload) => JSON.parse(payload?.contents || "{}")
+    }
+  ];
+
+  for (const source of sources) {
+    try {
+      const payload = await fetchJsonWithTimeout(source.url);
+      const data = source.unwrap(payload);
+      const result = data?.chart?.result?.[0];
+      const returnedSymbol = result?.meta?.symbol;
+      const price = Number(result?.meta?.regularMarketPrice);
+
+      if (returnedSymbol === ySymbol && Number.isFinite(price)) {
+        return { price, source: source.name };
+      }
+
+      console.warn(`Invalid quote payload from ${source.name} for ${ySymbol}`);
+    } catch (error) {
+      console.warn(`${source.name} failed for ${ySymbol}:`, error?.name || error);
+    }
   }
 
-  try {
-    const wrapped = await fetchJsonWithTimeout(
-      `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`
-    );
-    const data = JSON.parse(wrapped?.contents || "{}");
-    const price = extractYahooRegularMarketPrice(data);
-    if (price !== null) return price;
-  } catch (error) {
-    console.warn(`Proxy 2 failed for ${ySymbol}:`, error?.name || error);
-  }
-
-  return null;
+  return { price: null, source: null };
 }
 
 async function mapWithConcurrency(items, limit, mapper) {
@@ -1540,16 +1550,16 @@ async function syncMarketPrices() {
       assetKeys,
       MARKET_PRICE_CONCURRENCY,
       async (id) => {
-        const price = await fetchYahooPrice(master[id].ySymbol);
+        const quote = await fetchYahooPrice(master[id].ySymbol);
         completedCount += 1;
         if (syncDisplay) {
           syncDisplay.innerText = `시세 요청 중 (${completedCount}/${assetKeys.length})`;
         }
-        return { id, price };
+        return { id, price: quote?.price ?? null, source: quote?.source ?? null };
       }
     );
 
-    for (const { id, price } of results) {
+    for (const { id, price, source } of results) {
       const m = master[id];
       const isFX = id === "USDKRW" || m.ySymbol === "KRW=X";
 
@@ -1562,7 +1572,7 @@ async function syncMarketPrices() {
         }
 
         mtmPrices[`LAST_${id}`] = price;
-        htmlBuffer += `<span class="price-tag" style="color:${isFX ? 'var(--warn)' : 'var(--text)'}">${id} ${price.toFixed(2)}</span>`;
+        htmlBuffer += `<span class="price-tag" style="color:${isFX ? 'var(--warn)' : 'var(--text)'}" title="시세 출처: ${source || 'unknown'}">${id} ${price.toFixed(2)}</span>`;
       } else {
         const prevPrice = Number(mtmPrices[`LAST_${id}`]);
         const hasPrev = Number.isFinite(prevPrice);
