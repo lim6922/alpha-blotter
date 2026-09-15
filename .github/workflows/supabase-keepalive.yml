@@ -1,0 +1,46 @@
+name: Supabase Keepalive
+
+on:
+  schedule:
+    - cron: '0 23 * * *' # 08:00 KST daily
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/supabase-keepalive.yml
+
+permissions:
+  contents: read
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Call Supabase keep_alive RPC
+        shell: bash
+        run: |
+          KEY=$(python - <<'PY'
+          import re
+          text=open('js/supabase.js', encoding='utf-8').read()
+          m=re.search(r'const SUPABASE_ANON_KEY = "([^"]+)"', text)
+          if not m:
+              raise SystemExit('SUPABASE_ANON_KEY not found')
+          print(m.group(1))
+          PY
+          )
+
+          BODY_FILE=$(mktemp)
+          STATUS=$(curl -sS --max-time 15 -o "$BODY_FILE" -w "%{http_code}" \
+            -X POST "https://xbyaoqswxqpketnyypar.supabase.co/rest/v1/rpc/keep_alive" \
+            -H "Content-Type: application/json" \
+            -H "apikey: $KEY" \
+            -H "Authorization: Bearer $KEY" \
+            --data '{}')
+
+          echo "HTTP_STATUS=$STATUS"
+          cat "$BODY_FILE"
+          echo
+
+          test "$STATUS" = "200"
