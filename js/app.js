@@ -1439,41 +1439,83 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * =========================
- * Market prices (Yahoo via proxy) - 성능 개선 버전
+ * Market prices (Yahoo via proxy) - P0 bounded refresh
  * =========================
  */
+const MARKET_PRICE_TIMEOUT_MS = 3500;
+const MARKET_PRICE_CONCURRENCY = 2;
+
+async function fetchJsonWithTimeout(url, timeoutMs = MARKET_PRICE_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      cache: "no-store"
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function extractYahooRegularMarketPrice(data) {
+  const value = Number(data?.chart?.result?.[0]?.meta?.regularMarketPrice);
+  return Number.isFinite(value) ? value : null;
+}
+
 async function fetchYahooPrice(ySymbol) {
-  const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ySymbol}?interval=1m&range=1d&_seed=${Date.now()}`;
+  const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ySymbol)}?interval=1m&range=1d&_seed=${Date.now()}`;
 
-  // 1순위 프록시: corsproxy.io
   try {
-    const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
-    if (res.ok) {
-      const data = await res.json();
-      const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-      if (price) return price;
-    }
-  } catch (e) { console.warn(`Proxy 1 failed for ${ySymbol}`); }
+    const data = await fetchJsonWithTimeout(
+      `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`
+    );
+    const price = extractYahooRegularMarketPrice(data);
+    if (price !== null) return price;
+  } catch (error) {
+    console.warn(`Proxy 1 failed for ${ySymbol}:`, error?.name || error);
+  }
 
-  // 2순위 프록시: allorigins (백업)
   try {
-    const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
-    if (res.ok) {
-      const json = await res.json();
-      const data = JSON.parse(json.contents);
-      const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-      if (price) return price;
-    }
-  } catch (e) { console.warn(`Proxy 2 failed for ${ySymbol}`); }
+    const wrapped = await fetchJsonWithTimeout(
+      `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`
+    );
+    const data = JSON.parse(wrapped?.contents || "{}");
+    const price = extractYahooRegularMarketPrice(data);
+    if (price !== null) return price;
+  } catch (error) {
+    console.warn(`Proxy 2 failed for ${ySymbol}:`, error?.name || error);
+  }
 
   return null;
 }
-/**
- * 시세 동기화 메인 함수
- * 실패하더라도 티커는 무조건 노출하며, 요청 간격을 두어 안정성을 확보합니다.
- */
+
+async function mapWithConcurrency(items, limit, mapper) {
+  const results = new Array(items.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (true) {
+      const index = cursor++;
+      if (index >= items.length) return;
+      results[index] = await mapper(items[index], index);
+    }
+  }
+
+  const workerCount = Math.min(Math.max(1, limit), items.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
+
 async function syncMarketPrices() {
-  const btn = document.querySelector('.btn-green');
+  const btn = document.querySelector('button.btn-green[onclick*="syncMarketPrices"]') || document.querySelector('.btn-green');
   const monitor = document.getElementById('fx-monitor');
   const syncDisplay = document.getElementById('sync-time-display');
 
@@ -1482,75 +1524,81 @@ async function syncMarketPrices() {
   btn.innerText = "⏳ 시세 요청 중...";
   btn.disabled = true;
 
-  // ySymbol이 설정된 모든 상품 추출
   const assetKeys = Object.keys(master).filter(id => master[id] && master[id].ySymbol);
   let updatedCount = 0;
+  let completedCount = 0;
   let htmlBuffer = "";
 
   try {
-    for (const id of assetKeys) {
-      const price = await fetchYahooPrice(master[id].ySymbol);
+    if (!assetKeys.length) {
+      monitor.innerHTML = '<span style="font-size:10px; color:var(--muted);">대상 상품 없음</span>';
+      if (syncDisplay) syncDisplay.innerText = "대상 상품 없음";
+      return;
+    }
+
+    const results = await mapWithConcurrency(
+      assetKeys,
+      MARKET_PRICE_CONCURRENCY,
+      async (id) => {
+        const price = await fetchYahooPrice(master[id].ySymbol);
+        completedCount += 1;
+        if (syncDisplay) {
+          syncDisplay.innerText = `시세 요청 중 (${completedCount}/${assetKeys.length})`;
+        }
+        return { id, price };
+      }
+    );
+
+    for (const { id, price } of results) {
       const m = master[id];
       const isFX = id === "USDKRW" || m.ySymbol === "KRW=X";
 
       if (price !== null) {
-        // [성공] 시세 업데이트
-        updatedCount++;
+        updatedCount += 1;
 
         if (isFX) {
           globalFX = price;
           localStorage.setItem('blotter_fx_v96', String(globalFX));
         }
 
-        // 최신가 저장
         mtmPrices[`LAST_${id}`] = price;
-
-        // 정상 표시 (흰색/노란색)
         htmlBuffer += `<span class="price-tag" style="color:${isFX ? 'var(--warn)' : 'var(--text)'}">${id} ${price.toFixed(2)}</span>`;
       } else {
-        // [실패] 시세 획득 실패 시에도 티커는 표시
-        const prevPrice = mtmPrices[`LAST_${id}`];
-        const displayPrice = prevPrice ? Number(prevPrice).toFixed(2) : "---";
-
-        // 실패 상태 표시 (회색/반투명)
-        htmlBuffer += `<span class="price-tag" style="color:var(--muted); opacity:0.6;" title="시세 갱신 실패">${id} ${displayPrice}</span>`;
+        const prevPrice = Number(mtmPrices[`LAST_${id}`]);
+        const hasPrev = Number.isFinite(prevPrice);
+        const displayPrice = hasPrev ? prevPrice.toFixed(2) : "---";
+        htmlBuffer += `<span class="price-tag" style="color:var(--muted); opacity:0.6;" title="시세 갱신 실패 · 이전값 유지">${id} ${displayPrice}</span>`;
       }
-
-      // 요청 간격 (안정성)
-      await sleep(100);
     }
 
-    // 결과 화면 반영 (중간에 실패했어도 버퍼에 쌓인 티커들이 모두 출력됨)
-    monitor.innerHTML = htmlBuffer || '<span style="font-size:10px; color:var(--muted);">대상 상품 없음</span>';
+    monitor.innerHTML = htmlBuffer;
 
-    // ================================
-    // [Active Positions] 현재가 덮어쓰기
-    // ================================
     const res = calculateEngine();
     res.openPos.forEach(p => {
       const last = mtmPrices[`LAST_${p.asset}`];
-      if (last != null) {
-        mtmPrices[p.key] = last;
-      }
+      if (last != null) mtmPrices[p.key] = last;
     });
 
     localStorage.setItem('blotter_mtm_v96', JSON.stringify(mtmPrices));
 
-    // 현재 선택 상품 입력창 자동 완성
-    const currentAsset = document.getElementById('asset').value;
-    if (mtmPrices[`LAST_${currentAsset}`]) {
-      document.getElementById('price').value = mtmPrices[`LAST_${currentAsset}`];
-    }
+    const currentAssetEl = document.getElementById('asset');
+    const priceEl = document.getElementById('price');
+    const currentAsset = currentAssetEl?.value;
+    const currentLast = currentAsset ? mtmPrices[`LAST_${currentAsset}`] : null;
+    if (priceEl && currentLast != null) priceEl.value = currentLast;
 
     const now = new Date().toLocaleTimeString();
-    syncDisplay.innerText = updatedCount === assetKeys.length ? `전체 갱신: ${now}` : `일부 갱신 (${updatedCount}/${assetKeys.length}): ${now}`;
+    if (syncDisplay) {
+      syncDisplay.innerText = updatedCount === assetKeys.length
+        ? `전체 갱신: ${now}`
+        : `일부 갱신 (${updatedCount}/${assetKeys.length}): ${now}`;
+    }
 
     renderAll();
     runCalc();
-
   } catch (error) {
     console.error("동기화 중 오류:", error);
-    syncDisplay.innerText = "네트워크 오류";
+    if (syncDisplay) syncDisplay.innerText = "네트워크 오류";
   } finally {
     btn.innerText = "🔄 시세 강제 동기화";
     btn.disabled = false;
