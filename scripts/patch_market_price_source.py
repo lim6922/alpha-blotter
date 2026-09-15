@@ -76,20 +76,4 @@ if old_success not in text:
     raise SystemExit('success render block not found')
 text = text.replace(old_success, new_success, 1)
 
-old_status = '''      if (syncDisplay) {
-        syncDisplay.innerText = updatedCount === assetKeys.length
-          ? `전체 갱신: ${now}`
-          : `일부 갱신 (${updatedCount}/${assetKeys.length}): ${now}`;
-      }'''
-new_status = '''      if (syncDisplay) {
-        syncDisplay.innerText = updatedCount === assetKeys.length
-          ? `전체 갱신: ${now}`
-          : updatedCount === 0
-            ? `시세 경로 실패 (0/${assetKeys.length}): ${now}`
-            : `일부 갱신 (${updatedCount}/${assetKeys.length}): ${now}`;
-      }'''
-if old_status not in text:
-    raise SystemExit('status block not found')
-text = text.replace(old_status, new_status, 1)
-
 path.write_text(text, encoding='utf-8')
