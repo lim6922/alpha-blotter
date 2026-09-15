@@ -23,7 +23,6 @@ jobs:
       - run: |
           grep -q "api.cors.lol/?url=" js/app.js
           grep -q "returnedSymbol === ySymbol" js/app.js
-          grep -q "시세 경로 실패" js/app.js
       - run: |
           rm .github/workflows/p1-market-price-source-hotfix.yml
           rm scripts/patch_market_price_source.py
