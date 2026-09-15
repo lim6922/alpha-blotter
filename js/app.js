@@ -1439,89 +1439,54 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * =========================
- * Market prices (Yahoo via proxy) - P0 bounded refresh
+ * Market prices (Supabase Edge Function gateway)
  * =========================
  */
-const MARKET_PRICE_TIMEOUT_MS = 3500;
-const MARKET_PRICE_CONCURRENCY = 2;
+const MARKET_PRICE_TIMEOUT_MS = 7000;
 
-async function fetchJsonWithTimeout(url, timeoutMs = MARKET_PRICE_TIMEOUT_MS) {
+async function fetchMarketPriceBatch(assetKeys) {
+  const symbols = [...new Set(
+    assetKeys
+      .map(id => master[id]?.ySymbol)
+      .filter(Boolean)
+  )];
+
+  if (!symbols.length) return {};
+
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const timer = setTimeout(() => controller.abort(), MARKET_PRICE_TIMEOUT_MS);
 
   try {
-    const res = await fetch(url, {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/market-prices`, {
+      method: 'POST',
       signal: controller.signal,
-      cache: "no-store"
+      cache: 'no-store',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({ symbols })
     });
 
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
+    if (!response.ok) {
+      let detail = '';
+      try {
+        detail = await response.text();
+      } catch (_) {}
+      throw new Error(`Market gateway HTTP ${response.status}${detail ? `: ${detail.slice(0, 160)}` : ''}`);
     }
 
-    return await res.json();
+    const payload = await response.json();
+    const quotes = payload?.quotes;
+
+    if (!quotes || typeof quotes !== 'object') {
+      throw new Error('Market gateway returned invalid payload');
+    }
+
+    return quotes;
   } finally {
     clearTimeout(timer);
   }
-}
-
-function extractYahooRegularMarketPrice(data) {
-  const value = Number(data?.chart?.result?.[0]?.meta?.regularMarketPrice);
-  return Number.isFinite(value) ? value : null;
-}
-
-async function fetchYahooPrice(ySymbol) {
-  const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ySymbol)}?interval=1m&range=1d&_seed=${Date.now()}`;
-
-  const sources = [
-    {
-      name: "cors.lol",
-      url: `https://api.cors.lol/?url=${encodeURIComponent(targetUrl)}`,
-      unwrap: (payload) => payload
-    },
-    {
-      name: "allorigins",
-      url: `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,
-      unwrap: (payload) => JSON.parse(payload?.contents || "{}")
-    }
-  ];
-
-  for (const source of sources) {
-    try {
-      const payload = await fetchJsonWithTimeout(source.url);
-      const data = source.unwrap(payload);
-      const result = data?.chart?.result?.[0];
-      const returnedSymbol = result?.meta?.symbol;
-      const price = Number(result?.meta?.regularMarketPrice);
-
-      if (returnedSymbol === ySymbol && Number.isFinite(price)) {
-        return { price, source: source.name };
-      }
-
-      console.warn(`Invalid quote payload from ${source.name} for ${ySymbol}`);
-    } catch (error) {
-      console.warn(`${source.name} failed for ${ySymbol}:`, error?.name || error);
-    }
-  }
-
-  return { price: null, source: null };
-}
-
-async function mapWithConcurrency(items, limit, mapper) {
-  const results = new Array(items.length);
-  let cursor = 0;
-
-  async function worker() {
-    while (true) {
-      const index = cursor++;
-      if (index >= items.length) return;
-      results[index] = await mapper(items[index], index);
-    }
-  }
-
-  const workerCount = Math.min(Math.max(1, limit), items.length);
-  await Promise.all(Array.from({ length: workerCount }, () => worker()));
-  return results;
 }
 
 async function syncMarketPrices() {
@@ -1531,39 +1496,34 @@ async function syncMarketPrices() {
 
   if (!btn || !monitor) return;
 
-  btn.innerText = "⏳ 시세 요청 중...";
+  btn.innerText = '⏳ 시세 요청 중...';
   btn.disabled = true;
 
   const assetKeys = Object.keys(master).filter(id => master[id] && master[id].ySymbol);
   let updatedCount = 0;
-  let completedCount = 0;
-  let htmlBuffer = "";
+  let htmlBuffer = '';
 
   try {
     if (!assetKeys.length) {
       monitor.innerHTML = '<span style="font-size:10px; color:var(--muted);">대상 상품 없음</span>';
-      if (syncDisplay) syncDisplay.innerText = "대상 상품 없음";
+      if (syncDisplay) syncDisplay.innerText = '대상 상품 없음';
       return;
     }
 
-    const results = await mapWithConcurrency(
-      assetKeys,
-      MARKET_PRICE_CONCURRENCY,
-      async (id) => {
-        const quote = await fetchYahooPrice(master[id].ySymbol);
-        completedCount += 1;
-        if (syncDisplay) {
-          syncDisplay.innerText = `시세 요청 중 (${completedCount}/${assetKeys.length})`;
-        }
-        return { id, price: quote?.price ?? null, source: quote?.source ?? null };
-      }
-    );
+    if (syncDisplay) {
+      syncDisplay.innerText = `시세 요청 중 (0/${assetKeys.length})`;
+    }
 
-    for (const { id, price, source } of results) {
+    const quotesBySymbol = await fetchMarketPriceBatch(assetKeys);
+
+    for (const id of assetKeys) {
       const m = master[id];
-      const isFX = id === "USDKRW" || m.ySymbol === "KRW=X";
+      const quote = quotesBySymbol[m.ySymbol];
+      const price = Number(quote?.price);
+      const hasPrice = Number.isFinite(price);
+      const isFX = id === 'USDKRW' || m.ySymbol === 'KRW=X';
 
-      if (price !== null) {
+      if (hasPrice) {
         updatedCount += 1;
 
         if (isFX) {
@@ -1572,12 +1532,17 @@ async function syncMarketPrices() {
         }
 
         mtmPrices[`LAST_${id}`] = price;
-        htmlBuffer += `<span class="price-tag" style="color:${isFX ? 'var(--warn)' : 'var(--text)'}" title="시세 출처: ${source || 'unknown'}">${id} ${price.toFixed(2)}</span>`;
+        const cacheLabel = quote?.cached ? ' · cache' : '';
+        htmlBuffer += `<span class="price-tag" style="color:${isFX ? 'var(--warn)' : 'var(--text)'}" title="시세 출처: Supabase → Yahoo${cacheLabel}">${id} ${price.toFixed(2)}</span>`;
       } else {
         const prevPrice = Number(mtmPrices[`LAST_${id}`]);
         const hasPrev = Number.isFinite(prevPrice);
-        const displayPrice = hasPrev ? prevPrice.toFixed(2) : "---";
+        const displayPrice = hasPrev ? prevPrice.toFixed(2) : '---';
         htmlBuffer += `<span class="price-tag" style="color:var(--muted); opacity:0.6;" title="시세 갱신 실패 · 이전값 유지">${id} ${displayPrice}</span>`;
+      }
+
+      if (syncDisplay) {
+        syncDisplay.innerText = `시세 반영 중 (${updatedCount}/${assetKeys.length})`;
       }
     }
 
@@ -1601,16 +1566,30 @@ async function syncMarketPrices() {
     if (syncDisplay) {
       syncDisplay.innerText = updatedCount === assetKeys.length
         ? `전체 갱신: ${now}`
-        : `일부 갱신 (${updatedCount}/${assetKeys.length}): ${now}`;
+        : updatedCount === 0
+          ? `시세 게이트웨이 실패 (0/${assetKeys.length}): ${now}`
+          : `일부 갱신 (${updatedCount}/${assetKeys.length}): ${now}`;
     }
 
     renderAll();
     runCalc();
   } catch (error) {
-    console.error("동기화 중 오류:", error);
-    if (syncDisplay) syncDisplay.innerText = "네트워크 오류";
+    console.error('Supabase market price sync failed:', error);
+
+    htmlBuffer = assetKeys.map(id => {
+      const prevPrice = Number(mtmPrices[`LAST_${id}`]);
+      const displayPrice = Number.isFinite(prevPrice) ? prevPrice.toFixed(2) : '---';
+      return `<span class="price-tag" style="color:var(--muted); opacity:0.6;" title="시세 게이트웨이 오류 · 이전값 유지">${id} ${displayPrice}</span>`;
+    }).join('');
+    monitor.innerHTML = htmlBuffer;
+
+    if (syncDisplay) {
+      syncDisplay.innerText = error?.name === 'AbortError'
+        ? '시세 게이트웨이 시간초과'
+        : '시세 게이트웨이 오류';
+    }
   } finally {
-    btn.innerText = "🔄 시세 강제 동기화";
+    btn.innerText = '🔄 시세 강제 동기화';
     btn.disabled = false;
   }
 }
