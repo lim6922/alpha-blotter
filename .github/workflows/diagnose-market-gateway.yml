@@ -1,4 +1,4 @@
-name: Diagnose Market Gateway
+name: Finalize Market Gateway
 
 on:
   push:
@@ -8,14 +8,17 @@ on:
       - .github/workflows/diagnose-market-gateway.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  diagnose:
+  finalize:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Call Supabase market gateway
+        with:
+          fetch-depth: 0
+
+      - name: Verify gateway returns all four quotes
         shell: bash
         run: |
           KEY=$(python - <<'PY'
@@ -34,12 +37,24 @@ jobs:
             -H "Content-Type: application/json" \
             -H "apikey: $KEY" \
             --data '{"symbols":["KRW=X","MES=F","MNQ=F","MCL=F"]}')
-          echo "HTTP_STATUS=$STATUS"
-          echo "RESPONSE_BODY_START"
           cat "$BODY_FILE"
-          echo
-          echo "RESPONSE_BODY_END"
           test "$STATUS" = "200"
           grep -q '"received":4' "$BODY_FILE"
 
-# rerun: fx-fallback-validation
+      - name: Bust browser cache and remove diagnostic workflow
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          text = p.read_text(encoding='utf-8')
+          text = text.replace('src="js/supabase.js"', 'src="js/supabase.js?v=20260916-p2"')
+          text = text.replace('src="js/app.js"', 'src="js/app.js?v=20260916-p2"')
+          p.write_text(text, encoding='utf-8')
+          PY
+          rm .github/workflows/diagnose-market-gateway.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html .github/workflows/diagnose-market-gateway.yml
+          git commit -m "fix: finalize Supabase market gateway rollout"
+          git push origin HEAD:main
