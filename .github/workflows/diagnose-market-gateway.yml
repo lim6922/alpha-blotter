@@ -40,5 +40,6 @@ jobs:
           echo
           echo "RESPONSE_BODY_END"
           test "$STATUS" = "200"
+          grep -q '"received":4' "$BODY_FILE"
 
-# rerun: publishable-key-diagnosis
+# rerun: fx-fallback-validation
