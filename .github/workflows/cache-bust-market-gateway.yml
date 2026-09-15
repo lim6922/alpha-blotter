@@ -1,0 +1,30 @@
+name: Cache Bust Market Gateway
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/cache-bust-market-gateway.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch script URLs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          text = p.read_text(encoding='utf-8')
+          text = text.replace('src="js/supabase.js"', 'src="js/supabase.js?v=20260916-p2"')
+          text = text.replace('src="js/app.js"', 'src="js/app.js?v=20260916-p2"')
+          p.write_text(text, encoding='utf-8')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "fix: bust market gateway browser cache"
+          git push origin HEAD:main
