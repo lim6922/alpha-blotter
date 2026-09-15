@@ -40,3 +40,5 @@ jobs:
           echo
           echo "RESPONSE_BODY_END"
           test "$STATUS" = "200"
+
+# rerun: publishable-key-diagnosis
