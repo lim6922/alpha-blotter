@@ -2,7 +2,7 @@ name: Supabase Keepalive
 
 on:
   schedule:
-    - cron: '0 23 * * *' # 08:00 KST daily
+    - cron: '17 0,8,16 * * *' # 09:17 / 17:17 / 01:17 KST
   workflow_dispatch:
   push:
     branches:
@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Call Supabase keep_alive RPC
+      - name: Generate Supabase database activity
         shell: bash
         run: |
           KEY=$(python - <<'PY'
@@ -31,16 +31,36 @@ jobs:
           PY
           )
 
-          BODY_FILE=$(mktemp)
-          STATUS=$(curl -sS --max-time 15 -o "$BODY_FILE" -w "%{http_code}" \
+          check_2xx() {
+            case "$1" in
+              2??) return 0 ;;
+              *) echo "Unexpected HTTP status: $1"; return 1 ;;
+            esac
+          }
+
+          RPC_BODY=$(mktemp)
+          RPC_STATUS=$(curl -sS --max-time 15 -o "$RPC_BODY" -w "%{http_code}" \
             -X POST "https://xbyaoqswxqpketnyypar.supabase.co/rest/v1/rpc/keep_alive" \
             -H "Content-Type: application/json" \
             -H "apikey: $KEY" \
             -H "Authorization: Bearer $KEY" \
             --data '{}')
 
-          echo "HTTP_STATUS=$STATUS"
-          cat "$BODY_FILE"
+          echo "RPC_HTTP_STATUS=$RPC_STATUS"
+          cat "$RPC_BODY"
           echo
+          check_2xx "$RPC_STATUS"
 
-          test "$STATUS" = "200"
+          # Supabase's Free Plan pausing logic looks for sufficient user DB activity.
+          # Exercise a real RLS-protected table read as well as the lightweight RPC.
+          # With the anon role, trades rows remain hidden by RLS.
+          TABLE_BODY=$(mktemp)
+          TABLE_STATUS=$(curl -sS --max-time 15 -o "$TABLE_BODY" -w "%{http_code}" \
+            "https://xbyaoqswxqpketnyypar.supabase.co/rest/v1/trades?select=id&limit=1" \
+            -H "apikey: $KEY" \
+            -H "Authorization: Bearer $KEY")
+
+          echo "TABLE_HTTP_STATUS=$TABLE_STATUS"
+          cat "$TABLE_BODY"
+          echo
+          check_2xx "$TABLE_STATUS"
